@@ -1,0 +1,36 @@
+{
+  "name": "arqon-maestro-chrome",
+  "version": "2.0.3",
+  "description": "Code with voice. Learn more at https://arqon.ai.",
+  "main": "dist/index.js",
+  "author": "Arqon Labs, Inc. <contact@arqon.ai>",
+  "keywords": ["voice", "accessibility"],
+  "license": "MIT",
+  "homepage": "https://arqon.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arqonai/chrome.git"
+  },
+  "bugs": {
+    "url": "https://github.com/arqonai/chrome/issues"
+  },
+  "scripts": {
+    "build": "webpack --mode development",
+    "dist": "webpack --mode production && zip -r build.zip build img manifest.json",
+    "watch": "webpack --mode development --watch",
+    "test": "open http://localhost:8001/src/test & python3 -m http.server 8001"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.174",
+    "@types/uuid": "^8.3.3",
+    "copy-webpack-plugin": "^11.0.0",
+    "ts-loader": "^9.2.6",
+    "typescript": "^4.5.4",
+    "webpack": "^5.65.0",
+    "webpack-cli": "^4.9.1"
+  },
+  "dependencies": {
+    "findandreplacedomtext": "^0.4.6",
+    "uuid": "^8.3.2"
+  }
+}
