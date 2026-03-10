@@ -2,7 +2,7 @@ site_name: Arqon Maestro Chrome Extension Docs
 site_description: Voice-first control layer documentation for the Arqon ecosystem
 site_url: https://novelbytelabs.github.io/maestro-chrome-extension/
 repo_url: https://github.com/novelbytelabs/maestro-chrome-extension/
-repo_name: novelbytelabs/maestro-chrome-extensiong
+repo_name: novelbytelabs/maestro-chrome-extension
 edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: site
@@ -44,6 +44,8 @@ theme:
 
 nav:
   - Overview: index.md
+  - Technical Specification: SPEC.md
+  - Implementation Plan: IMPLEMENTATION_PLAN.md
 
 markdown_extensions:
   - attr_list
@@ -87,10 +89,7 @@ extra_css:
   - stylesheets/extra.css
 
 # This tells mkdocs where your documentation source files are
-docs_dir: "docs"
 
-# This allows GitHub Actions to deploy the site to the gh-pages branch
-edit_uri: edit/main/docs/
 
 # Additional configuration
 # plugins:
