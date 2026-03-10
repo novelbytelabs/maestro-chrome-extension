@@ -8,14 +8,15 @@
 
 ## 1. Executive Summary
 
-This document provides the technical specification for the ArqonMaestro Chrome Extension v2.0. This is a major upgrade from the original "Serenade for Chrome" extension, including rebranding to ArqonMaestro and integration with the ArqonMaestro backend.
+This document provides the technical specification for the ArqonMaestro Chrome Extension v2.0. This is a major upgrade from the original "Serenade for Chrome" extension, including rebranding to ArqonMaestro and integration with Arqon Bus.
 
 ### 1.1 Goals
 
 - Provide voice-controlled browser workflows for ArqonMaestro users
 - Enable hands-free web navigation, form filling, and content interaction
-- Integrate seamlessly with the ArqonMaestro backend via WebSocket
+- Integrate seamlessly with Arqon Bus via WebSocket
 - Support web-based code editors (Ace, CodeMirror, Monaco)
+- Keep port scope explicit: extension transport uses Arqon Bus (`9100`), not core stream (`17200/stream/`)
 
 ---
 
@@ -41,7 +42,7 @@ flowchart TB
     
     IPC <-->|chrome.runtime messaging| CS
     
-    IPC <-->|WebSocket| Backend[Maestro Backend<br/>ws://localhost:17200]
+    IPC <-->|WebSocket| Backend[Arqon Bus<br/>ws://localhost:9100]
 ```
 
 ### 2.2 File Structure
@@ -82,7 +83,7 @@ maestro-chrome-extension/
 ### 3.2 ipc.ts (Communication Layer)
 
 - WebSocket client connecting to backend
-- **URL:** `ws://localhost:17200/`
+- **URL:** `ws://localhost:9100/`
 - Routes commands between background and content scripts
 - Manages connection state
 - Updates toolbar icon based on connection status
@@ -138,7 +139,7 @@ Simple popup with:
 
 ```typescript
 // Connection URL
-const URL = "ws://localhost:17200/";
+const URL = "ws://localhost:9100/";
 ```
 
 ### 4.2 Message Format
@@ -149,7 +150,7 @@ const URL = "ws://localhost:17200/";
 { message: "heartbeat", data: { app: "chrome", id: "chrome" } }
 { message: "callback", data: { callback: "...", data: {...} } }
 
-// Incoming messages (from backend)
+// Incoming messages (from Arqon Bus backend)
 { message: "response", data: { response: { execute: { commandsList: [...] } }, callback: "..." } }
 ```
 
@@ -197,7 +198,7 @@ When user says `click <text>`:
 
 | Item | Status |
 |------|--------|
- | WebSocket URL | ✅ Updated to 17200 |
+ | WebSocket URL | ✅ Updated to 9100 |
  | Source code references | ✅ All Serenade references removed |
 
 ---

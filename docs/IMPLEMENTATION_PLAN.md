@@ -31,14 +31,14 @@ The extension source code has been cloned from the Serenade repository and initi
 ## Phase 1: Core Integration
 
 **Duration:** 1 Week  
-**Goal:** Connect to ArqonMaestro backend
+**Goal:** Connect to Arqon Bus endpoint used by ArqonMaestro
 
 ### Tasks
 
 #### 1.1 WebSocket Configuration
 
-- [ ] Update `src/ipc.ts` WebSocket URL from `ws://localhost:17373/` to `ws://localhost:17200/`
-- [ ] Test connection to ArqonMaestro backend
+- [x] Confirm `src/ipc.ts` WebSocket URL is `ws://localhost:9100/`
+- [ ] Test connection to Arqon Bus backend
 - [ ] Verify command routing works
 
 #### 1.2 Source Code Rebranding
@@ -53,7 +53,7 @@ The extension source code has been cloned from the Serenade repository and initi
 - [ ] Load extension in Chrome
 - [ ] Verify connection to backend
 
-**Deliverable:** Extension connects to ArqonMaestro backend
+**Deliverable:** Extension connects to Arqon Bus backend (`ws://localhost:9100/`)
 
 ---
 
@@ -188,10 +188,10 @@ flowchart LR
 
 ### 2. WebSocket Port
 
-**Decision:** Use port 17200 (ArqonMaestro default)
+**Decision:** Use port 9100 (Arqon Bus default)
 
 **Rationale:**
-- Matches ArqonMaestro backend configuration
+- Matches Arqon Bus local endpoint configuration
 - Standard for Arqon ecosystem
 
 ### 3. Build Tool
@@ -220,7 +220,7 @@ flowchart LR
 ## Success Criteria
 
 1. Extension installs from Chrome Web Store
-2. WebSocket connects to ArqonMaestro backend within 5 seconds
+2. WebSocket connects to Arqon Bus (`ws://localhost:9100/`) within 5 seconds
 3. Voice toggle responds within 100ms
 4. Overlay displays on pages with 100+ links
 5. Navigation commands execute successfully
