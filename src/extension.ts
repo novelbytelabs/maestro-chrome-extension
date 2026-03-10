@@ -42,10 +42,24 @@ chrome.idle.onStateChanged.addListener(async (state) => {
   }
 });
 
-chrome.runtime.onMessage.addListener(async (message, _sender, _sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type == "reconnect") {
-    await ensureConnection();
+    ensureConnection()
+      .then(() => {
+        sendResponse({ connected: ipc.isConnected() });
+      })
+      .catch(() => {
+        sendResponse({ connected: ipc.isConnected() });
+      });
+    return true;
   }
+
+  if (message.type == "connection-status") {
+    sendResponse({ connected: ipc.isConnected() });
+    return false;
+  }
+
+  return false;
 });
 
 // The rest of this is adapted from the solution here:

@@ -7,12 +7,64 @@ export default class IPC {
   private connected: boolean = false;
   private id: string = "";
   private websocket?: WebSocket;
-  private url: string = "ws://localhost:17373/";
+  private url: string = "ws://localhost:9100/";
+  private readonly room: string = "maestro";
+  private readonly channel: string = "plugin.chrome";
+  private readonly protocol: string = "maestro-plugin-v1";
+  private messageCounter: number = 0;
 
   constructor(app: string, extensionCommandHandler: ExtensionCommandHandler) {
     this.app = app;
     this.extensionCommandHandler = extensionCommandHandler;
     this.id = app; // Two instances of chrome share the same service worker.
+  }
+
+  private nextMessageId(): string {
+    this.messageCounter += 1;
+    const short = uuidv4().replace(/-/g, "").slice(0, 6);
+    return `arq_${Date.now()}_${this.messageCounter}_${short}`;
+  }
+
+  private toEnvelope(message: string, data: any) {
+    return {
+      id: this.nextMessageId(),
+      timestamp: new Date().toISOString(),
+      type: "message",
+      version: "1.0",
+      room: this.room,
+      channel: this.channel,
+      payload: {
+        protocol: this.protocol,
+        app: this.app,
+        id: this.id,
+        message,
+        data,
+      },
+      metadata: {
+        transport: "arqonbus",
+      },
+    };
+  }
+
+  private extractLegacyRequest(parsed: any): any {
+    if (!parsed || typeof parsed != "object") {
+      return null;
+    }
+
+    // Legacy plugin protocol message shape.
+    if (typeof parsed.message == "string") {
+      return parsed;
+    }
+
+    // ArqonBus envelope carrying legacy payload in `payload`.
+    if (parsed.payload && typeof parsed.payload.message == "string") {
+      return {
+        message: parsed.payload.message,
+        data: parsed.payload.data,
+      };
+    }
+
+    return null;
   }
 
   private onClose() {
@@ -24,8 +76,12 @@ export default class IPC {
     if (typeof message == "string") {
       let request;
       try {
-        request = JSON.parse(message);
+        request = this.extractLegacyRequest(JSON.parse(message));
       } catch (e) {
+        return;
+      }
+
+      if (!request) {
         return;
       }
 
@@ -87,12 +143,18 @@ export default class IPC {
 
   private async sendMessageToContentScript(message: any): Promise<void> {
     let tab = await this.tab();
-    if (!tab?.id || tab.url?.startsWith("chrome://")) {
+    const url = tab?.url || "";
+    const isSupportedUrl = /^https?:\/\//.test(url);
+    if (!tab?.id || !isSupportedUrl) {
       return;
     }
 
     return new Promise((resolve) => {
       chrome.tabs.sendMessage(tab!.id!, message, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve(undefined);
+          return;
+        }
         resolve(response);
       });
     });
@@ -151,7 +213,7 @@ export default class IPC {
     }
 
     try {
-      this.websocket!.send(JSON.stringify({ message, data }));
+      this.websocket!.send(JSON.stringify(this.toEnvelope(message, data)));
       return true;
     } catch (e) {
       this.connected = false;

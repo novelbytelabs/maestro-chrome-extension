@@ -10,6 +10,21 @@ body {
 
 h1 {
   font-size: 1.3rem;
+  margin-bottom: 0.35rem;
+}
+
+#connectionStatus {
+  font-size: 0.9rem;
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+#connectionStatus.connected {
+  color: #0f766e;
+}
+
+#connectionStatus.disconnected {
+  color: #b91c1c;
 }
 
 a {

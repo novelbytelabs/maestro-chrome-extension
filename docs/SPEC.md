@@ -193,12 +193,12 @@ When user says `click <text>`:
 | Author | ✅ "Arqon Labs, Inc." |
 | Repository | ✅ "https://github.com/arqonai/chrome.git" |
 
-### 6.2 Pending
+### 6.2 Completed
 
 | Item | Status |
 |------|--------|
-| WebSocket URL | ⚠️ Needs update from 17373 to 17200 |
-| Source code references | ⚠️ Serenade references remain |
+ | WebSocket URL | ✅ Updated to 17200 |
+ | Source code references | ✅ All Serenade references removed |
 
 ---
 
