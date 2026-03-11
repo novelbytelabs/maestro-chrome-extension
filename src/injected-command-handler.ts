@@ -2,6 +2,8 @@ import * as editors from "./editors";
 
 export default class InjectedCommandHandler {
   private overlays: { node: Node; type: string }[] = [];
+  private overlayClearTimeout?: number;
+  private overlayLifecycleBound: boolean = false;
   private settings = {
     alwaysShowClickables: false,
   };
@@ -24,12 +26,43 @@ export default class InjectedCommandHandler {
   }
 
   private clearOverlays() {
+    if (this.overlayClearTimeout !== undefined) {
+      window.clearTimeout(this.overlayClearTimeout);
+      this.overlayClearTimeout = undefined;
+    }
     let overlays = document.querySelectorAll("[id^=arqon-overlay]");
     overlays.forEach((overlay) => {
       overlay!.remove();
     });
 
     this.overlays = [];
+  }
+
+  private scheduleOverlayClear() {
+    if (this.overlayClearTimeout !== undefined) {
+      window.clearTimeout(this.overlayClearTimeout);
+    }
+    this.overlayClearTimeout = window.setTimeout(() => {
+      this.clearOverlays();
+    }, 5000);
+  }
+
+  private bindOverlayLifecycle() {
+    if (this.overlayLifecycleBound) {
+      return;
+    }
+    this.overlayLifecycleBound = true;
+
+    window.addEventListener("blur", () => this.clearOverlays());
+    window.addEventListener("pagehide", () => this.clearOverlays());
+    window.addEventListener("keydown", () => this.clearOverlays(), true);
+    window.addEventListener("mousedown", () => this.clearOverlays(), true);
+    window.addEventListener("scroll", () => this.clearOverlays(), true);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState != "visible") {
+        this.clearOverlays();
+      }
+    });
   }
 
   private inViewport(element: HTMLElement) {
@@ -240,7 +273,7 @@ export default class InjectedCommandHandler {
 
   private showCopyOverlay(index: number) {
     const overlay = document.createElement("div");
-    overlay.innerHTML = `Copied ${index}`;
+    overlay.textContent = `Copied ${index}`;
     overlay.id = "arqon-copy-overlay";
     document.body.appendChild(overlay);
     this.createAlarm('remove-overlay', 1);
@@ -252,22 +285,23 @@ export default class InjectedCommandHandler {
   }
 
   private showOverlays(nodes: Node[], overlayType: string) {
+    this.bindOverlayLifecycle();
     if (this.overlays.length > 0) {
       this.clearOverlays();
     }
-    const bodyRect = document.body.getBoundingClientRect();
     for (let i = 0; i < nodes.length; i++) {
       let element = nodes[i] as HTMLElement;
       const elementRect = element.getBoundingClientRect();
       const overlay = document.createElement("div");
-      overlay.innerHTML = `${i + 1}`;
+      overlay.textContent = `${i + 1}`;
       overlay.id = `arqon-overlay-${i + 1}`;
       overlay.className = "arqon-overlay";
-      overlay.style.top = elementRect.top - bodyRect.top + "px";
-      overlay.style.left = elementRect.left - bodyRect.left - overlay.clientWidth + "px";
+      overlay.style.top = `${Math.max(0, elementRect.top)}px`;
+      overlay.style.left = `${Math.max(0, elementRect.left)}px`;
       document.body.appendChild(overlay);
       this.overlays.push({ node: nodes[i], type: overlayType });
     }
+    this.scheduleOverlayClear();
   }
 
   async COMMAND_TYPE_BACK(_data: any): Promise<any> {
@@ -380,9 +414,6 @@ export default class InjectedCommandHandler {
   }
 
   async COMMAND_TYPE_GET_EDITOR_STATE(_data: any): Promise<any> {
-    if (this.settings.alwaysShowClickables) {
-      this.COMMAND_TYPE_SHOW({ text: "all" });
-    }
     const editor = editors.active();
     if (!editor) {
       return { source: "", cursor: 0, available: false };
@@ -413,22 +444,35 @@ export default class InjectedCommandHandler {
   }
 
   async COMMAND_TYPE_SHOW(data: any): Promise<any> {
+    const target = String(data?.text || data?.path || data?.value || data?.target || "")
+      .toLowerCase()
+      .trim();
     let selector = "";
-    if (data.text == "links") {
+    if (target == "links") {
       selector = 'a, button, summary, [role="link"], [role="button"]';
-    } else if (data.text == "inputs") {
+    } else if (target == "inputs") {
       selector =
         'input, textarea, [role="checkbox"], [role="radio"], label, [contenteditable="true"]';
-    } else if (data.text == "code") {
+    } else if (target == "code") {
       selector = "pre, code";
-    } else if (data.text == "all") {
+    } else if (target == "all") {
       selector =
         'a, button, summary, [role="link"], [role="button"], input, textarea, [role="checkbox"], [role="radio"], label, [contenteditable="true"]';
     } else {
-      return;
+      return {
+        ok: false,
+        error: `Unsupported show target: ${target}`,
+        received: data,
+      };
     }
     const nodes = this.nodesMatchingSelector(selector);
-    this.showOverlays(Array.from(nodes), data.text);
+    this.showOverlays(Array.from(nodes), target);
+    return {
+      ok: true,
+      overlayType: target,
+      count: nodes.length,
+      received: data,
+    };
   }
 
   async COMMAND_TYPE_UNDO(_data: any): Promise<any> {

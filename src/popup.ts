@@ -26,14 +26,11 @@ function refreshConnectionStatus() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   refreshConnectionStatus();
-  chrome.storage.sync.get(
-    {
-      alwaysShowClickables: false,
-    },
-    function (settings) {
-      showClickablesCheckbox.checked = settings.alwaysShowClickables;
-    }
-  );
+  showClickablesCheckbox.checked = false;
+  showClickablesCheckbox.disabled = true;
+  chrome.storage.sync.set({
+    alwaysShowClickables: false,
+  });
 });
 
 docsButton.addEventListener("click", (event) => {
@@ -55,29 +52,5 @@ reconnectButton?.addEventListener("click", (event) => {
 });
 
 showClickablesCheckbox?.addEventListener("change", () => {
-  const settings = {
-    alwaysShowClickables: showClickablesCheckbox.checked,
-  };
-  chrome.storage.sync.set({
-    alwaysShowClickables: settings.alwaysShowClickables
-  });
-  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    const tab = tabs[0];
-    const tabUrl = tab?.url || "";
-    const isSupportedUrl = /^https?:\/\//.test(tabUrl);
-    if (!tab?.id || !isSupportedUrl) {
-      return;
-    }
-    chrome.tabs.sendMessage(tab.id, {
-      type: "injected-script-command-request",
-      data: {
-        type: "updateSettings",
-        ...settings,
-      },
-    }, () => {
-      if (chrome.runtime.lastError) {
-        return;
-      }
-    });
-  });
+  showClickablesCheckbox.checked = false;
 });

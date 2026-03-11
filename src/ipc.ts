@@ -2,12 +2,13 @@ import { v4 as uuidv4 } from "uuid";
 import ExtensionCommandHandler from "./extension-command-handler";
 
 export default class IPC {
+  private static readonly preferredTabStorageKey = "preferredTabId";
   private app: string;
   private extensionCommandHandler: ExtensionCommandHandler;
   private connected: boolean = false;
   private id: string = "";
   private websocket?: WebSocket;
-  private url: string = "ws://localhost:9100/";
+  private url: string = "ws://localhost:9100/?room=maestro&channel=plugin.chrome";
   private readonly probeUrl: string = "http://localhost:9100/";
   private readonly room: string = "maestro";
   private readonly channel: string = "plugin.chrome";
@@ -16,6 +17,8 @@ export default class IPC {
   private connectingPromise?: Promise<boolean>;
   private nextRetryAt: number = 0;
   private retryDelayMs: number = 0;
+  private preferredTabId?: number;
+  private lastLiveShow?: any;
 
   constructor(app: string, extensionCommandHandler: ExtensionCommandHandler) {
     this.app = app;
@@ -229,32 +232,187 @@ export default class IPC {
     return this.connectingPromise;
   }
 
-  private async tab(): Promise<any> {
-    const [result] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
+  private async tab(): Promise<chrome.tabs.Tab | undefined> {
+    if (this.preferredTabId === undefined) {
+      try {
+        const stored = await chrome.storage.local.get(IPC.preferredTabStorageKey);
+        const storedTabId = stored[IPC.preferredTabStorageKey];
+        if (typeof storedTabId == "number") {
+          this.preferredTabId = storedTabId;
+        }
+      } catch (_error) {}
+    }
+
+    if (this.preferredTabId !== undefined) {
+      try {
+        const preferred = await chrome.tabs.get(this.preferredTabId);
+        if (preferred?.id && /^https?:\/\//.test(preferred.url || "")) {
+          return preferred;
+        }
+      } catch (_error) {
+        await this.rememberPreferredTab(undefined);
+      }
+    }
+
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const tab = tabs.find((candidate) => /^https?:\/\//.test(candidate.url || ""));
+    if (tab?.id) {
+      this.preferredTabId = tab.id;
+      return tab;
+    }
+
+    const windows = await chrome.windows.getAll({ populate: true });
+    for (const window of windows) {
+      if (window.type != "normal") {
+        continue;
+      }
+      const active = (window.tabs || []).find((candidate) => candidate.active);
+      const url = active?.url || "";
+      if (active?.id && /^https?:\/\//.test(url)) {
+        this.preferredTabId = active.id;
+        return active;
+      }
+    }
+
+    return undefined;
+  }
+
+  rememberPreferredTab(tabId?: number) {
+    this.preferredTabId = tabId;
+    if (tabId === undefined) {
+      return chrome.storage.local.remove(IPC.preferredTabStorageKey);
+    }
+    return chrome.storage.local.set({
+      [IPC.preferredTabStorageKey]: tabId,
+    });
+  }
+
+  preferredTab() {
+    return this.preferredTabId;
+  }
+
+  lastLiveShowDiagnostics() {
+    return this.lastLiveShow;
+  }
+
+  private async sendToTab(tabId: number, message: any): Promise<any> {
+    return new Promise((resolve) => {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({
+            ok: false,
+            error: chrome.runtime.lastError.message,
+          });
+          return;
+        }
+        resolve({
+          ok: true,
+          response,
+        });
+      });
+    });
+  }
+
+  private async sendToFrame(tabId: number, frameId: number, message: any): Promise<any> {
+    return new Promise((resolve) => {
+      chrome.tabs.sendMessage(tabId, message, { frameId }, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({
+            ok: false,
+            error: chrome.runtime.lastError.message,
+            frameId,
+          });
+          return;
+        }
+        resolve({
+          ok: true,
+          response,
+          frameId,
+        });
+      });
+    });
+  }
+
+  private async frameIdsForTab(tabId: number): Promise<number[]> {
+    const frames = await chrome.webNavigation.getAllFrames({ tabId });
+    const ids = (frames || [])
+      .filter((frame) => /^https?:\/\//.test(frame.url || ""))
+      .map((frame) => frame.frameId);
+    const unique = Array.from(new Set(ids));
+    return unique.length > 0 ? unique : [0];
+  }
+
+  private async ensureContentScript(tabId: number): Promise<void> {
+    await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      files: ["build/content-script.js"],
+    });
+  }
+
+  private async sendShowToBestFrame(tabId: number, message: any): Promise<any> {
+    let frameIds = await this.frameIdsForTab(tabId);
+    let attempts = await Promise.all(frameIds.map((frameId) => this.sendToFrame(tabId, frameId, message)));
+
+    const missingReceiver = attempts.every(
+      (attempt) => !attempt.ok && attempt.error == "Could not establish connection. Receiving end does not exist."
+    );
+
+    if (missingReceiver) {
+      try {
+        await this.ensureContentScript(tabId);
+      } catch (_error) {}
+      frameIds = await this.frameIdsForTab(tabId);
+      attempts = await Promise.all(frameIds.map((frameId) => this.sendToFrame(tabId, frameId, message)));
+    }
+
+    const successful = attempts.filter((attempt) => attempt.ok);
+    if (successful.length == 0) {
+      return attempts[0];
+    }
+
+    successful.sort((left, right) => {
+      const leftCount = Number(left.response?.count || 0);
+      const rightCount = Number(right.response?.count || 0);
+      return rightCount - leftCount;
     });
 
-    return result;
+    return {
+      ...successful[0],
+      frameIdsTried: frameIds,
+      attempts,
+    };
   }
 
   private async sendMessageToContentScript(message: any): Promise<void> {
-    let tab = await this.tab();
-    const url = tab?.url || "";
-    const isSupportedUrl = /^https?:\/\//.test(url);
-    if (!tab?.id || !isSupportedUrl) {
+    const tab = await this.tab();
+    if (!tab?.id) {
       return;
     }
 
-    return new Promise((resolve) => {
-      chrome.tabs.sendMessage(tab!.id!, message, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve(undefined);
-          return;
-        }
-        resolve(response);
-      });
-    });
+    if (message?.type == "injected-script-command-request" && message?.data?.type == "COMMAND_TYPE_SHOW") {
+      const attempt = await this.sendShowToBestFrame(tab.id, message);
+      if (!attempt?.ok) {
+        return;
+      }
+      return attempt.response;
+    }
+
+    let attempt = await this.sendToTab(tab.id, message);
+    if (
+      !attempt.ok &&
+      attempt.error == "Could not establish connection. Receiving end does not exist."
+    ) {
+      try {
+        await this.ensureContentScript(tab.id);
+      } catch (_error) {}
+      attempt = await this.sendToTab(tab.id, message);
+    }
+
+    if (!attempt.ok) {
+      return;
+    }
+
+    return attempt.response;
   }
 
   async handle(response: any): Promise<any> {
@@ -264,10 +422,27 @@ export default class IPC {
         if (command.type in (this.extensionCommandHandler as any)) {
           handlerResponse = await (this.extensionCommandHandler as any)[command.type](command);
         } else {
-          handlerResponse = await this.sendMessageToContentScript({
+          const request = {
             type: "injected-script-command-request",
             data: command,
-          });
+          };
+          if (command.type == "COMMAND_TYPE_SHOW") {
+            const tab = await this.tab();
+            this.lastLiveShow = {
+              at: new Date().toISOString(),
+              preferredTabId: this.preferredTabId,
+              resolvedTabId: tab?.id,
+              command,
+              request,
+            };
+          }
+          handlerResponse = await this.sendMessageToContentScript(request);
+          if (command.type == "COMMAND_TYPE_SHOW") {
+            this.lastLiveShow = {
+              ...(this.lastLiveShow || {}),
+              result: handlerResponse,
+            };
+          }
         }
       }
     }

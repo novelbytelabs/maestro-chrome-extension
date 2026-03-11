@@ -1,7 +1,7 @@
 # ArqonMaestro Chrome Extension Implementation Plan
 
 **Version:** 1.0  
-**Status:** In Progress  
+**Status:** Phase 3 In Progress  
 **Target:** Chrome Extension v2.0  
 
 ---
@@ -25,6 +25,8 @@ The extension source code has been cloned from the Serenade repository and initi
 - [x] Update package.json with Arqon branding
 - [x] Add Arqon logo assets
 - [x] Create mkdocs.yml for documentation
+- [x] Remove remaining Serenade references from runtime source
+- [x] Add local runbook and backend troubleshooting docs
 
 ---
 
@@ -38,22 +40,22 @@ The extension source code has been cloned from the Serenade repository and initi
 #### 1.1 WebSocket Configuration
 
 - [x] Confirm `src/ipc.ts` WebSocket URL is `ws://localhost:9100/`
-- [ ] Test connection to Arqon Bus backend
-- [ ] Verify command routing works
+- [x] Test connection to Arqon Bus backend
+- [x] Verify command routing works
 
 #### 1.2 Source Code Rebranding
 
-- [ ] Update all Serenade references in source code comments
-- [ ] Update popup documentation link
-- [ ] Update error messages
+- [x] Update all Serenade references in source code comments
+- [x] Update popup documentation link
+- [x] Update error messages
 
 #### 1.3 Testing
 
-- [ ] Build extension with `npm run build`
-- [ ] Load extension in Chrome
-- [ ] Verify connection to backend
+- [x] Build extension with `npm run build`
+- [x] Load extension in Chrome
+- [x] Verify connection to backend
 
-**Deliverable:** Extension connects to Arqon Bus backend (`ws://localhost:9100/`)
+**Deliverable:** Extension connects to Arqon Bus backend (`ws://localhost:9100/`) and reports a clean disconnected state when the backend is unavailable.
 
 ---
 
@@ -84,6 +86,20 @@ The extension source code has been cloned from the Serenade repository and initi
 
 **Deliverable:** All web editors work with ArqonMaestro ✅ (Already implemented)
 
+### Phase 1 Validation Notes
+
+- `src/ipc.ts` uses `ws://localhost:9100/` and now probes backend availability before opening a socket.
+- Local Arqon Bus availability verified on `127.0.0.1:9100` with `ss -ltnp`.
+- HTTP probe to `http://127.0.0.1:9100/` returned `426 Upgrade Required`, confirming a live WebSocket endpoint.
+- Extension build verified with `npm run build` on 2026-03-11.
+- Popup status and reconnect flow now reflect Arqon Bus connection state explicitly.
+
+### Phase 2 Validation Notes
+
+- Ace, CodeMirror, and Monaco support remain implemented in `src/editors.ts`.
+- The local editor test harness in `src/test/index.html` still exercises all three supported editors.
+- No Serenade-branded editor paths remain in runtime source.
+
 ---
 
 ## Phase 3: Feature Parity
@@ -112,6 +128,15 @@ The extension source code has been cloned from the Serenade repository and initi
 - [ ] Test scroll commands
 
 **Deliverable:** All voice commands work correctly
+
+### Phase 3 Execution Notes (Started: 2026-03-11)
+
+- Scope confirmed in source:
+  - Overlay + click-by-text commands implemented in `src/injected-command-handler.ts`
+  - Navigation reload command implemented in `src/extension-command-handler.ts`
+  - Scroll command implemented in `src/injected-command-handler.ts`
+- Validation runbook created: `docs/PHASE3_RUNBOOK.md`
+- Next closure step: execute the runbook end-to-end and attach pass/fail evidence for each checklist item below.
 
 ---
 

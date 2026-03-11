@@ -24,7 +24,6 @@ theme:
     - content.code.copy
     - search.highlight
     - search.suggest
-    - navigation.instant
   palette:
     - scheme: slate
       primary: deep purple
@@ -45,6 +44,7 @@ theme:
 nav:
   - Overview: index.md
   - Local Runbook: LOCAL_RUNBOOK.md
+  - Phase 3 Runbook: PHASE3_RUNBOOK.md
   - Technical Specification: SPEC.md
   - Implementation Plan: IMPLEMENTATION_PLAN.md
 
@@ -127,5 +127,3 @@ copyright: "Copyright &copy; 2026 NovelByte Labs - All rights reserved."
 
 plugins:
   - search:
-  - minify:
-      minify_html: true

@@ -3,7 +3,7 @@
   "name": "Arqon Maestro",
   "version": "2.0.4",
   "description": "Code with voice. Learn more at https://arqon.ai.",
-  "permissions": ["background", "tabs", "storage", "alarms", "idle", "scripting"],
+  "permissions": ["background", "tabs", "storage", "alarms", "idle", "scripting", "webNavigation"],
   "host_permissions": ["*://*/*"],
   "action": {
     "default_title": "Arqon Maestro for Chrome",
@@ -16,6 +16,7 @@
     {
       "js": ["build/content-script.js"],
       "matches": ["*://*/*"],
+      "all_frames": true,
       "run_at": "document_start"
     }
   ],

@@ -1,6 +1,6 @@
 # Arqon Maestro Chrome Extension
 
-Source for the [Arqon Maestro Chrome Extension](https://chrome.google.com/webstore/detail/arqon-maestro-for-chrome/)
+Source for the Arqon Maestro Chrome Extension.
 
 ## Installation
 
