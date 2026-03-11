@@ -8,6 +8,7 @@ The ArqonMaestro Chrome Extension enables voice-controlled web browsing and code
 
 ## Quick Links
 
+- [Local Runbook](LOCAL_RUNBOOK.md)
 - [Technical Specification](SPEC.md)
 - [Implementation Plan](IMPLEMENTATION_PLAN.md)
 

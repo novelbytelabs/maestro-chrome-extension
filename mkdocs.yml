@@ -44,6 +44,7 @@ theme:
 
 nav:
   - Overview: index.md
+  - Local Runbook: LOCAL_RUNBOOK.md
   - Technical Specification: SPEC.md
   - Implementation Plan: IMPLEMENTATION_PLAN.md
 

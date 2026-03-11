@@ -8,10 +8,14 @@ export default class IPC {
   private id: string = "";
   private websocket?: WebSocket;
   private url: string = "ws://localhost:9100/";
+  private readonly probeUrl: string = "http://localhost:9100/";
   private readonly room: string = "maestro";
   private readonly channel: string = "plugin.chrome";
   private readonly protocol: string = "maestro-plugin-v1";
   private messageCounter: number = 0;
+  private connectingPromise?: Promise<boolean>;
+  private nextRetryAt: number = 0;
+  private retryDelayMs: number = 0;
 
   constructor(app: string, extensionCommandHandler: ExtensionCommandHandler) {
     this.app = app;
@@ -69,6 +73,7 @@ export default class IPC {
 
   private onClose() {
     this.connected = false;
+    this.websocket = undefined;
     this.setIcon();
   }
 
@@ -99,37 +104,129 @@ export default class IPC {
 
   private onOpen() {
     this.connected = true;
+    this.retryDelayMs = 0;
+    this.nextRetryAt = 0;
     this.sendActive();
     this.setIcon();
   }
 
-  async ensureConnection(): Promise<void> {
+  private scheduleRetry() {
+    this.retryDelayMs = this.retryDelayMs === 0 ? 5000 : Math.min(this.retryDelayMs * 2, 60000);
+    this.nextRetryAt = Date.now() + this.retryDelayMs;
+  }
+
+  private async probeAvailability(): Promise<boolean> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+    try {
+      await fetch(this.probeUrl, {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      return true;
+    } catch (_error) {
+      return false;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  private async openWebSocket(): Promise<boolean> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const socket = new WebSocket(this.url);
+      const finish = (connected: boolean) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (!connected) {
+          this.connected = false;
+          this.websocket = undefined;
+          this.setIcon();
+        }
+        resolve(connected);
+      };
+
+      const timeoutId = setTimeout(() => {
+        try {
+          socket.close();
+        } catch (_error) {}
+        finish(false);
+      }, 3000);
+
+      this.websocket = socket;
+
+      socket.addEventListener("open", () => {
+        clearTimeout(timeoutId);
+        this.onOpen();
+        finish(true);
+      });
+
+      socket.addEventListener("close", () => {
+        clearTimeout(timeoutId);
+        this.onClose();
+        finish(false);
+      });
+
+      socket.addEventListener("error", () => {
+        clearTimeout(timeoutId);
+        try {
+          socket.close();
+        } catch (_error) {}
+        finish(false);
+      });
+
+      socket.addEventListener("message", (event) => {
+        this.onMessage(event.data);
+      });
+    });
+  }
+
+  async ensureConnection(force: boolean = false): Promise<boolean> {
     if (this.connected) {
-      return;
+      return true;
     }
 
-    return new Promise((resolve) => {
-      try {
-        this.websocket = new WebSocket(this.url);
+    if (this.connectingPromise) {
+      return this.connectingPromise;
+    }
 
-        this.websocket.addEventListener("open", () => {
-          this.onOpen();
-          resolve();
-        });
+    if (!force && Date.now() < this.nextRetryAt) {
+      this.setIcon();
+      return false;
+    }
 
-        this.websocket.addEventListener("close", () => {
-          this.onClose();
-        });
-
-        this.websocket.addEventListener("message", (event) => {
-          this.onMessage(event.data);
-        });
-      } catch (e) {
-        console.error(e);
+    this.connectingPromise = (async () => {
+      const available = await this.probeAvailability();
+      if (!available) {
         this.connected = false;
+        this.websocket = undefined;
+        this.scheduleRetry();
         this.setIcon();
+        return false;
       }
-    });
+
+      try {
+        const connected = await this.openWebSocket();
+        if (!connected) {
+          this.scheduleRetry();
+        }
+        return connected;
+      } catch (_error) {
+        this.connected = false;
+        this.websocket = undefined;
+        this.scheduleRetry();
+        this.setIcon();
+        return false;
+      } finally {
+        this.connectingPromise = undefined;
+      }
+    })();
+
+    return this.connectingPromise;
   }
 
   private async tab(): Promise<any> {

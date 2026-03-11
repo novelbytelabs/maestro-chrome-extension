@@ -64,6 +64,8 @@ The `Editor` class also contains some helper functions to determine a suitable f
    - Running `npm run test` will serve a simple page at `localhost:8001` with instances of the various inputs/code editors we support
    - The source for this test page can be found in `src/test`
 
+For local startup after a reboot, see [docs/LOCAL_RUNBOOK.md](docs/LOCAL_RUNBOOK.md).
+
 ## Deployment
 
 1. Update the version number in `manifest.json`

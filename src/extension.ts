@@ -1,10 +1,12 @@
 import ExtensionCommandHandler from "./extension-command-handler";
 import IPC from "./ipc";
 
-const ensureConnection = async () => {
-  await ipc.ensureConnection();
-  ipc.sendActive();
-  ipc.sendHeartbeat();
+const ensureConnection = async (force: boolean = false) => {
+  const connected = await ipc.ensureConnection(force);
+  if (connected) {
+    ipc.sendActive();
+    ipc.sendHeartbeat();
+  }
 };
 
 const extensionCommandHandler = new ExtensionCommandHandler();
@@ -44,7 +46,7 @@ chrome.idle.onStateChanged.addListener(async (state) => {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type == "reconnect") {
-    ensureConnection()
+    ensureConnection(true)
       .then(() => {
         sendResponse({ connected: ipc.isConnected() });
       })
