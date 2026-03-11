@@ -159,6 +159,17 @@ const debugShowLinks = async () => {
   }
 };
 
+const debugConnectionStatus = async () => ({
+  connected: ipc.isConnected(),
+  preferredTabId: ipc.preferredTab(),
+  lastLiveShow: ipc.lastLiveShowDiagnostics(),
+});
+
+const debugReconnect = async () => {
+  await ensureConnection(true);
+  return debugConnectionStatus();
+};
+
 const debugPingContentScript = async () => {
   const tab = await activeNormalTab();
   if (!tab?.id) {
@@ -190,6 +201,8 @@ const debugPingContentScript = async () => {
 (globalThis as any).__debugShowLinks = debugShowLinks;
 (globalThis as any).__debugPingContentScript = debugPingContentScript;
 (globalThis as any).__debugLastLiveShow = () => ipc.lastLiveShowDiagnostics();
+(globalThis as any).__debugConnectionStatus = debugConnectionStatus;
+(globalThis as any).__debugReconnect = debugReconnect;
 
 const extensionCommandHandler = new ExtensionCommandHandler();
 const ipc = new IPC(
