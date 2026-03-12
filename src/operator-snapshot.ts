@@ -48,6 +48,9 @@ export interface CommandTrace {
   normalizedPayload: any;
   targetTabId: number | null;
   targetFrameId: number | null;
+  targetResolutionState: TargetResolutionState;
+  targetResolutionSource: string | null;
+  targetResolutionReason: string | null;
   route: DispatchRoute;
   result: CommandResult;
   latencyMs: number;
@@ -59,6 +62,8 @@ export interface ResolvedTarget {
   tabId: number | null;
   frameId: number | null;
   state: TargetResolutionState;
+  source?: "preferred" | "active" | "window-scan" | "frame-analysis" | "none";
+  reason?: string | null;
 }
 
 export interface ConnectionState {

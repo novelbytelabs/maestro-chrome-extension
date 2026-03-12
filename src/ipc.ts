@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import ExtensionCommandHandler from "./extension-command-handler";
+import { commandCapability } from "./command-capabilities";
 import {
   ActivePageSummary,
   CommandResult,
@@ -38,6 +39,13 @@ export default class IPC {
   private preferredTabId?: number;
   private lastLiveShow?: any;
   private lastLiveCommand?: any;
+  private lastResolvedTargetDetails: ResolvedTarget = {
+    tabId: null,
+    frameId: null,
+    state: "unknown",
+    source: "none",
+    reason: null,
+  };
   private persistedLoaded: boolean = false;
   private snapshot: OperatorSnapshot = createOperatorSnapshot();
   private lastAnalyzeAtByTabId: { [tabId: number]: number } = {};
@@ -135,6 +143,7 @@ export default class IPC {
   }
 
   private updateResolvedTarget(target: ResolvedTarget) {
+    this.lastResolvedTargetDetails = Object.assign({}, this.lastResolvedTargetDetails, target);
     this.updateTargeting({
       lastResolvedTabId: target.tabId,
       lastResolvedFrameId: target.frameId,
@@ -144,6 +153,7 @@ export default class IPC {
 
   private deriveCommandLabel(command: any, fallbackText?: string): string {
     const commandType = String(command?.type || "unknown");
+    const capability = commandCapability(commandType);
     const text = String(
       command?.text ?? command?.path ?? command?.value ?? command?.target ?? fallbackText ?? ""
     )
@@ -164,6 +174,9 @@ export default class IPC {
     }
     if (commandType == "COMMAND_TYPE_SWITCH_TAB") {
       return `switch tab ${text}`.trim();
+    }
+    if (capability && !text) {
+      return capability.label;
     }
     if (text) {
       return `${commandType.replace(/^COMMAND_TYPE_/, "").toLowerCase().replace(/_/g, " ")} ${text}`.trim();
@@ -529,6 +542,8 @@ export default class IPC {
             tabId: preferred.id,
             frameId: this.snapshot.targeting.lastResolvedFrameId,
             state: "resolved",
+            source: "preferred",
+            reason: "Preferred tab was still valid and targetable.",
           });
           return preferred;
         }
@@ -544,6 +559,8 @@ export default class IPC {
         tabId: tab.id,
         frameId: this.snapshot.targeting.lastResolvedFrameId,
         state: "fallback",
+        source: "active",
+        reason: "Preferred tab was unavailable. Fell back to active tab in the last focused window.",
       });
       this.preferredTabId = tab.id;
       return tab;
@@ -562,6 +579,8 @@ export default class IPC {
           tabId: active.id,
           frameId: this.snapshot.targeting.lastResolvedFrameId,
           state: "fallback",
+          source: "window-scan",
+          reason: "Preferred tab and focused active tab were unavailable. Fell back to scanning normal windows.",
         });
         return active;
       }
@@ -571,6 +590,8 @@ export default class IPC {
       tabId: null,
       frameId: null,
       state: "missing",
+      source: "none",
+      reason: "No targetable http(s) tab could be resolved.",
     });
     return undefined;
   }
@@ -729,6 +750,8 @@ export default class IPC {
       tabId,
       frameId: successful[0].frameId,
       state: this.snapshot.targeting.targetResolutionState == "missing" ? "fallback" : "resolved",
+      source: "frame-analysis",
+      reason: "Selected the best responding frame based on overlay count.",
     });
 
     return {
@@ -743,6 +766,10 @@ export default class IPC {
   }
 
   private inferRouteFromContentResponse(command: any, response: any): DispatchRoute {
+    const capability = commandCapability(String(command?.type || ""));
+    if (capability) {
+      return capability.route;
+    }
     if (response?.path == "content-script-direct") {
       return "content-script-direct";
     }
@@ -789,6 +816,8 @@ export default class IPC {
       tabId: tab.id,
       frameId: this.snapshot.targeting.lastResolvedFrameId,
       state: attempt.ok ? this.snapshot.targeting.targetResolutionState : "missing",
+      source: attempt.ok ? this.snapshot.targeting.targetResolutionState == "fallback" ? "active" : "preferred" : "none",
+      reason: attempt.ok ? "Delivered command to the resolved tab target." : "Content script delivery failed for the resolved tab target.",
     });
 
     if (!attempt.ok) {
@@ -908,6 +937,8 @@ export default class IPC {
       tabId,
       frameId: primary.frameId,
       state: this.snapshot.targeting.targetResolutionState == "missing" ? "fallback" : "resolved",
+      source: "frame-analysis",
+      reason: "Chose the primary frame using focus, top-frame, then actionable-count priority.",
     });
     this.persistSnapshotFragments();
     return this.snapshot.activePage;
@@ -921,7 +952,8 @@ export default class IPC {
         const command = commands[i];
         const startedAt = Date.now();
         const navigationSequence = this.extractNavigationSequence(commands, i);
-        let route: DispatchRoute = "unknown";
+        const capability = commandCapability(String(command?.type || ""));
+        let route: DispatchRoute = capability ? capability.route : "unknown";
         let error: string | null = null;
         let targetTabId: number | null = this.snapshot.targeting.lastResolvedTabId;
         let targetFrameId: number | null = this.snapshot.targeting.lastResolvedFrameId;
@@ -960,7 +992,7 @@ export default class IPC {
             });
             i = navigationSequence.consumedUntil;
           } else if (command.type in (this.extensionCommandHandler as any)) {
-            route = "extension-worker";
+            route = capability ? capability.route : "extension-worker";
             this.lastLiveCommand = {
               at: new Date().toISOString(),
               preferredTabId: this.preferredTabId,
@@ -986,7 +1018,7 @@ export default class IPC {
               };
             }
             const delivery = await this.sendMessageToContentScript(command);
-            route = delivery.route;
+            route = delivery.route || route;
             targetTabId = delivery.targetTabId;
             targetFrameId = delivery.targetFrameId;
             handlerResponse = delivery.ok ? delivery.response : { ok: false, error: delivery.error };
@@ -1025,6 +1057,9 @@ export default class IPC {
           normalizedPayload,
           targetTabId,
           targetFrameId,
+          targetResolutionState: this.lastResolvedTargetDetails.state,
+          targetResolutionSource: this.lastResolvedTargetDetails.source || null,
+          targetResolutionReason: this.lastResolvedTargetDetails.reason || null,
           route,
           result: this.classifyResult(handlerResponse, route, compatibilityPathUsed),
           latencyMs: Date.now() - startedAt,

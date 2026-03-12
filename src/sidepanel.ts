@@ -1,3 +1,4 @@
+import { capabilitySummary, COMMAND_CAPABILITIES } from "./command-capabilities";
 import { CommandTrace, OperatorSnapshot } from "./operator-snapshot";
 
 const refreshButton = document.getElementById("refresh") as HTMLButtonElement;
@@ -18,6 +19,7 @@ const policyDomain = document.getElementById("policyDomain") as HTMLSpanElement;
 
 const historyList = document.getElementById("historyList") as HTMLDivElement;
 const diagnosticsList = document.getElementById("diagnosticsList") as HTMLDivElement;
+const capabilityList = document.getElementById("capabilityList") as HTMLDivElement;
 
 let refreshTimer: number | undefined;
 
@@ -79,8 +81,16 @@ function renderHistoryItem(trace: CommandTrace) {
   item.appendChild(route);
 
   const target = document.createElement("p");
-  target.textContent = `Target: tab ${trace.targetTabId ?? "n/a"} / frame ${trace.targetFrameId ?? "n/a"} • ${trace.latencyMs} ms`;
+  target.textContent = `Target: tab ${trace.targetTabId ?? "n/a"} / frame ${trace.targetFrameId ?? "n/a"} • ${titleCase(
+    trace.targetResolutionState
+  )} via ${trace.targetResolutionSource || "n/a"} • ${trace.latencyMs} ms`;
   item.appendChild(target);
+
+  if (trace.targetResolutionReason) {
+    const resolution = document.createElement("p");
+    resolution.textContent = `Resolution: ${trace.targetResolutionReason}`;
+    item.appendChild(resolution);
+  }
 
   if (trace.error) {
     const error = document.createElement("p");
@@ -173,6 +183,27 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
   }
 }
 
+function renderCapabilities() {
+  capabilityList.innerHTML = "";
+  const summary = capabilitySummary();
+  capabilityList.appendChild(
+    diagnosticItem(
+      "Support Summary",
+      `Stable ${summary.stable || 0} • Compatibility ${summary.compatibility || 0} • Experimental ${summary.experimental || 0}`
+    )
+  );
+  COMMAND_CAPABILITIES.forEach((capability) => {
+    capabilityList.appendChild(
+      diagnosticItem(
+        capability.label,
+        `${titleCase(capability.support)} • ${titleCase(capability.category)} • ${titleCase(capability.route)} • ${capability.type}${
+          capability.note ? ` • ${capability.note}` : ""
+        }`
+      )
+    );
+  });
+}
+
 function renderSnapshot(snapshot: OperatorSnapshot) {
   renderActivePage(snapshot);
   renderHistory(snapshot);
@@ -206,6 +237,7 @@ function scheduleRefresh() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  renderCapabilities();
   fetchSnapshot();
   scheduleRefresh();
 });
