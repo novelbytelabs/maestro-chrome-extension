@@ -14,7 +14,10 @@
             <p class="eyebrow">Arqon Maestro // Chrome</p>
             <h1>Operator Surface</h1>
           </div>
-          <button id="refresh" class="inline-action" type="button">Refresh</button>
+          <div class="hero-actions">
+            <span id="panelModeBadge" class="panel-badge">Pilot</span>
+            <button id="refresh" class="inline-action" type="button">Refresh</button>
+          </div>
         </div>
         <p class="lede">Persistent page intelligence, execution history, and worker diagnostics.</p>
       </section>
@@ -102,10 +105,41 @@
           </div>
           <div class="metric">
             <span class="metric-label">Overlay posture</span>
-            <span class="metric-value">Disabled</span>
+            <span id="policyOverlay" class="metric-value">Disabled</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Automation mode</span>
+            <span id="policyAutomation" class="metric-value">Pilot</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Dry run recommendation</span>
+            <span id="policyDryRun" class="metric-value">No</span>
           </div>
         </div>
-        <p class="lede small">Per-site policy editing is deferred. This panel is read-only in Wave 3.</p>
+        <p class="lede small">Per-site policy editing is deferred. This panel is read-only and acts as the future policy seam.</p>
+      </section>
+
+      <section class="panel-card">
+        <p class="section-label">Future Features</p>
+        <div class="metric-grid compact">
+          <div class="metric">
+            <span class="metric-label">Teach mode</span>
+            <span id="futureTeachMode" class="metric-value">Planned</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Dry run</span>
+            <span id="futureDryRun" class="metric-value">Planned</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Site profiles</span>
+            <span id="futureSiteProfiles" class="metric-value">Planned</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Semantic memory</span>
+            <span id="futureMemory" class="metric-value">Foundation</span>
+          </div>
+        </div>
+        <p class="lede small">Wave 7 adds the state seams only. Authoring and workflow behavior remain intentionally unimplemented.</p>
       </section>
     </main>
     <script src="sidepanel.js"></script>

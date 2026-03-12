@@ -1,5 +1,6 @@
 export type ReconnectState = "idle" | "connecting" | "backoff" | "connected" | "failed";
 export type TargetResolutionState = "unknown" | "resolved" | "fallback" | "missing";
+export type OperatorMode = "observe" | "assist" | "pilot" | "locked";
 export type PageType = "editor" | "form" | "dashboard" | "docs" | "generic" | "unknown";
 export type FocusedTarget =
   | "monaco"
@@ -113,7 +114,27 @@ export interface PageAnalysisResult {
   frameLocalTimestamp: number;
 }
 
+export interface SitePolicyPreview {
+  domain: string;
+  scope: "tab" | "domain" | "global";
+  overlayPolicy: "disabled" | "tab-scoped" | "domain-scoped" | "global";
+  automationPolicy: "observe" | "assist" | "pilot" | "locked";
+  sensitiveDomain: boolean;
+  teachModeAllowed: boolean;
+  dryRunRecommended: boolean;
+}
+
+export interface FutureFeatureState {
+  teachMode: "planned";
+  dryRun: "planned";
+  siteProfiles: "planned";
+  semanticMemory: "foundation";
+  semanticHandlesCount: number;
+  rememberedCommandsCount: number;
+}
+
 export interface OperatorSnapshot {
+  mode: OperatorMode;
   connection: ConnectionState;
   targeting: {
     preferredTabId: number | null;
@@ -145,6 +166,8 @@ export interface OperatorSnapshot {
     lastContentScriptReinjectionReason: string | null;
   };
   lifecycle: LifecycleEvent[];
+  sitePolicy: SitePolicyPreview;
+  future: FutureFeatureState;
 }
 
 export function emptyActionableCounts(): ActionableCounts {
@@ -175,6 +198,7 @@ export function emptyActivePageSummary(): ActivePageSummary {
 
 export function createOperatorSnapshot(): OperatorSnapshot {
   return {
+    mode: "pilot",
     connection: {
       busConnected: false,
       workerSessionStartedAt: Date.now(),
@@ -217,5 +241,22 @@ export function createOperatorSnapshot(): OperatorSnapshot {
       lastContentScriptReinjectionReason: null,
     },
     lifecycle: [],
+    sitePolicy: {
+      domain: "",
+      scope: "tab",
+      overlayPolicy: "disabled",
+      automationPolicy: "pilot",
+      sensitiveDomain: false,
+      teachModeAllowed: false,
+      dryRunRecommended: false,
+    },
+    future: {
+      teachMode: "planned",
+      dryRun: "planned",
+      siteProfiles: "planned",
+      semanticMemory: "foundation",
+      semanticHandlesCount: 0,
+      rememberedCommandsCount: 0,
+    },
   };
 }

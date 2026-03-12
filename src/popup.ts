@@ -6,6 +6,7 @@ const refreshButton = document.getElementById("refresh") as HTMLButtonElement;
 const sidePanelButton = document.getElementById("sidepanel") as HTMLButtonElement;
 const showClickablesCheckbox = document.getElementById("showClickables") as HTMLInputElement;
 const overlayPolicyCopy = document.getElementById("overlayPolicyCopy") as HTMLParagraphElement;
+const modeBadge = document.getElementById("modeBadge") as HTMLSpanElement;
 
 const connectionStatus = document.getElementById("connectionStatus") as HTMLParagraphElement;
 const connectionHint = document.getElementById("connectionHint") as HTMLParagraphElement;
@@ -26,6 +27,10 @@ const lastActionLatency = document.getElementById("lastActionLatency") as HTMLSp
 const lastActionError = document.getElementById("lastActionError") as HTMLParagraphElement;
 
 const diagnosticsContent = document.getElementById("diagnosticsContent") as HTMLDivElement;
+const futureTeachMode = document.getElementById("futureTeachMode") as HTMLSpanElement;
+const futureDryRun = document.getElementById("futureDryRun") as HTMLSpanElement;
+const futureSiteProfiles = document.getElementById("futureSiteProfiles") as HTMLSpanElement;
+const futureMemory = document.getElementById("futureMemory") as HTMLSpanElement;
 
 let refreshTimer: number | undefined;
 let reconnectInFlight = false;
@@ -79,6 +84,10 @@ function setConnectionStatus(snapshot: OperatorSnapshot) {
   reconnectMeta.textContent = `State: ${titleCase(connection.reconnectState)} • Last heartbeat: ${relativeTime(
     connection.lastHeartbeatAt
   )}`;
+}
+
+function renderMode(snapshot: OperatorSnapshot) {
+  modeBadge.textContent = titleCase(snapshot.mode);
 }
 
 function renderActivePage(snapshot: OperatorSnapshot) {
@@ -151,11 +160,20 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
   }
 }
 
+function renderFutureSurface(snapshot: OperatorSnapshot) {
+  futureTeachMode.textContent = titleCase(snapshot.future.teachMode);
+  futureDryRun.textContent = titleCase(snapshot.future.dryRun);
+  futureSiteProfiles.textContent = titleCase(snapshot.future.siteProfiles);
+  futureMemory.textContent = `${titleCase(snapshot.future.semanticMemory)} • ${snapshot.future.rememberedCommandsCount} traces`;
+}
+
 function renderSnapshot(snapshot: OperatorSnapshot) {
+  renderMode(snapshot);
   setConnectionStatus(snapshot);
   renderActivePage(snapshot);
   renderLastAction(snapshot);
   renderDiagnostics(snapshot);
+  renderFutureSurface(snapshot);
 }
 
 function fetchSnapshot() {

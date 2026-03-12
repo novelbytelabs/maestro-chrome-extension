@@ -9,9 +9,12 @@
   <body>
     <main class="shell">
       <section class="hero">
-        <p class="eyebrow">Arqon Maestro // Chrome</p>
+        <div class="hero-topline">
+          <p class="eyebrow">Arqon Maestro // Chrome</p>
+          <span id="modeBadge" class="mode-badge">Pilot</span>
+        </div>
         <h1>Operator Deck</h1>
-        <p class="lede">Wave 2 popup backed by the Wave 1 operator snapshot and runtime diagnostics.</p>
+        <p class="lede">Popup backed by the operator snapshot, with lifecycle diagnostics and Wave 7 feature seams.</p>
       </section>
 
       <section class="status-card">
@@ -102,6 +105,28 @@
       <section class="intel-card">
         <p class="section-label">Diagnostics</p>
         <div id="diagnosticsContent" class="diagnostics-content"></div>
+      </section>
+
+      <section class="intel-card">
+        <p class="section-label">Future Surface</p>
+        <div class="metric-grid compact">
+          <div class="metric">
+            <span class="metric-label">Teach mode</span>
+            <span id="futureTeachMode" class="metric-value">Planned</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Dry run</span>
+            <span id="futureDryRun" class="metric-value">Planned</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Site profiles</span>
+            <span id="futureSiteProfiles" class="metric-value">Planned</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Memory layer</span>
+            <span id="futureMemory" class="metric-value">Foundation</span>
+          </div>
+        </div>
       </section>
     </main>
     <script src="popup.js"></script>

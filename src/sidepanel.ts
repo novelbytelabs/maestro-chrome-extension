@@ -2,6 +2,7 @@ import { capabilitySummary, COMMAND_CAPABILITIES } from "./command-capabilities"
 import { CommandTrace, OperatorSnapshot } from "./operator-snapshot";
 
 const refreshButton = document.getElementById("refresh") as HTMLButtonElement;
+const panelModeBadge = document.getElementById("panelModeBadge") as HTMLSpanElement;
 
 const pageSite = document.getElementById("pageSite") as HTMLSpanElement;
 const pageTitle = document.getElementById("pageTitle") as HTMLSpanElement;
@@ -16,11 +17,18 @@ const pageShadow = document.getElementById("pageShadow") as HTMLSpanElement;
 const pageInjection = document.getElementById("pageInjection") as HTMLSpanElement;
 const pageAnalyzed = document.getElementById("pageAnalyzed") as HTMLSpanElement;
 const policyDomain = document.getElementById("policyDomain") as HTMLSpanElement;
+const policyOverlay = document.getElementById("policyOverlay") as HTMLSpanElement;
+const policyAutomation = document.getElementById("policyAutomation") as HTMLSpanElement;
+const policyDryRun = document.getElementById("policyDryRun") as HTMLSpanElement;
 
 const historyList = document.getElementById("historyList") as HTMLDivElement;
 const diagnosticsList = document.getElementById("diagnosticsList") as HTMLDivElement;
 const lifecycleList = document.getElementById("lifecycleList") as HTMLDivElement;
 const capabilityList = document.getElementById("capabilityList") as HTMLDivElement;
+const futureTeachMode = document.getElementById("futureTeachMode") as HTMLSpanElement;
+const futureDryRun = document.getElementById("futureDryRun") as HTMLSpanElement;
+const futureSiteProfiles = document.getElementById("futureSiteProfiles") as HTMLSpanElement;
+const futureMemory = document.getElementById("futureMemory") as HTMLSpanElement;
 
 let refreshTimer: number | undefined;
 
@@ -67,6 +75,10 @@ function renderActivePage(snapshot: OperatorSnapshot) {
   pageInjection.textContent = titleCase(activePage.injectionHealth);
   pageAnalyzed.textContent = relativeTime(activePage.analyzedAt);
   policyDomain.textContent = activePage.hostname || "n/a";
+}
+
+function renderMode(snapshot: OperatorSnapshot) {
+  panelModeBadge.textContent = titleCase(snapshot.mode);
 }
 
 function renderHistoryItem(trace: CommandTrace) {
@@ -249,11 +261,28 @@ function renderCapabilities() {
   });
 }
 
+function renderPolicy(snapshot: OperatorSnapshot) {
+  policyDomain.textContent = snapshot.sitePolicy.domain || snapshot.activePage.hostname || "n/a";
+  policyOverlay.textContent = titleCase(snapshot.sitePolicy.overlayPolicy);
+  policyAutomation.textContent = titleCase(snapshot.sitePolicy.automationPolicy);
+  policyDryRun.textContent = snapshot.sitePolicy.dryRunRecommended ? "Recommended" : "Not required";
+}
+
+function renderFuture(snapshot: OperatorSnapshot) {
+  futureTeachMode.textContent = titleCase(snapshot.future.teachMode);
+  futureDryRun.textContent = titleCase(snapshot.future.dryRun);
+  futureSiteProfiles.textContent = titleCase(snapshot.future.siteProfiles);
+  futureMemory.textContent = `${titleCase(snapshot.future.semanticMemory)} • ${snapshot.future.rememberedCommandsCount} traces`;
+}
+
 function renderSnapshot(snapshot: OperatorSnapshot) {
+  renderMode(snapshot);
   renderActivePage(snapshot);
   renderHistory(snapshot);
   renderDiagnostics(snapshot);
   renderLifecycle(snapshot);
+  renderPolicy(snapshot);
+  renderFuture(snapshot);
 }
 
 function fetchSnapshot() {

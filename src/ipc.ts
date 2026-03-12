@@ -89,6 +89,7 @@ export default class IPC {
       const activePage = stored[IPC.activePageStorageKey];
       if (activePage && typeof activePage == "object") {
         this.snapshot.activePage = Object.assign(emptyActivePageSummary(), activePage);
+        this.syncSitePolicyState();
       }
     } catch (error) {
       this.setLastError(String(error));
@@ -126,6 +127,26 @@ export default class IPC {
       error: trace.error,
       timestamp: trace.timestamp,
     };
+  }
+
+  private syncFutureState() {
+    this.snapshot.future.rememberedCommandsCount = this.snapshot.history.length;
+  }
+
+  private syncSitePolicyState() {
+    const hostname = this.snapshot.activePage.hostname || "";
+    const sensitiveDomain =
+      /(^|\\.)(bank|billing|pay|stripe|paypal|auth|login|account)(\\.|$)/i.test(hostname);
+
+    this.snapshot.sitePolicy = Object.assign({}, this.snapshot.sitePolicy, {
+      domain: hostname,
+      scope: "tab",
+      overlayPolicy: "disabled",
+      automationPolicy: this.snapshot.mode,
+      sensitiveDomain,
+      teachModeAllowed: !sensitiveDomain,
+      dryRunRecommended: sensitiveDomain || this.snapshot.activePage.pageType == "dashboard",
+    });
   }
 
   private recordLifecycle(kind: LifecycleEvent["kind"], detail: string) {
@@ -306,6 +327,7 @@ export default class IPC {
     this.snapshot.history = [trace].concat(this.snapshot.history).slice(0, IPC.maxHistoryEntries);
     this.syncLastActionFromTrace(trace);
     this.snapshot.diagnostics.compatibilityPathUsed = trace.compatibilityPathUsed;
+    this.syncFutureState();
     this.persistSnapshotFragments();
   }
 
@@ -710,6 +732,7 @@ export default class IPC {
       this.snapshot.activePage.injectionHealth = "missing";
       this.snapshot.activePage.analyzedAt = Date.now();
       this.snapshot.diagnostics.analyzePageReachable = false;
+      this.syncSitePolicyState();
       this.persistSnapshotFragments();
       return this.snapshot.activePage;
     }
@@ -982,6 +1005,7 @@ export default class IPC {
         injectionHealth: "missing",
         analyzedAt: now,
       });
+      this.syncSitePolicyState();
       this.lastAnalyzeAtByTabId[tabId] = now;
       this.persistSnapshotFragments();
       return this.snapshot.activePage;
@@ -1005,6 +1029,7 @@ export default class IPC {
       injectionHealth,
       analyzedAt: now,
     };
+    this.syncSitePolicyState();
     this.lastAnalyzeAtByTabId[tabId] = now;
     this.updateResolvedTarget({
       tabId,
