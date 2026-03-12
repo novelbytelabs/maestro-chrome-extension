@@ -39,8 +39,8 @@ Public beta scope:
 • On sensitive domains, explicit inspection commands may be allowed while action execution remains policy-limited
 
 Learn more: https://novelbytelabs.github.io/ArqonMaestro/guides/getting-started/
-Support: https://novelbytelabs.github.io/maestro-chrome-extension/
-Privacy Policy: https://arqon.ai/privacy
+Support: https://github.com/novelbytelabs/maestro-chrome-extension/issues
+Privacy Policy: https://novelbytelabs.github.io/ArqonMaestro/privacy-policy/maestro-chrome-extension/PRIVACY_POLICY/
 ```
 
 ### Category
@@ -72,12 +72,9 @@ Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 | 6 | `tmp/screenshots/cws-06-popup-sensitive-policy-override.png` | Popup showing sensitive-page policy override from requested mode to effective mode | 1280x800 |
 | 7 | `tmp/screenshots/cws-07-link-overlays-normal-page.png` | Link overlays on a normal page using `show links` | 1280x800 |
 
-### 3. Promotional Images (Optional but recommended)
+### 3. Promotional Images (Optional)
 
-| Image Type | Size | Purpose |
-|------------|------|---------|
-| Marquee | 440x280 | Storefront thumbnail |
-| Small promo tile | 920x680 | Featured on store |
+Promotional images are not required for the current public beta submission. The listing is expected to ship with the icon set and screenshot set above.
 
 ---
 
@@ -102,7 +99,7 @@ Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 - [x] Write short description (≤132 chars)
 - [x] Write detailed description
 - [x] Create/upload screenshots (1280x800 recommended)
-- [ ] Add promotional images (optional)
+- [ ] Add promotional images (optional, skip for current beta)
 - [x] Set category: Developer Tools
 - [x] Add privacy policy URL
 - [ ] Verify extension works in Chrome

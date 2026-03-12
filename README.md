@@ -34,7 +34,7 @@ Most of the extensions functionality is in three files: `extension-command-handl
 
 ### Command Handlers
 
-Both command handlers contain functions named for the various command types in the [Arqon Maestro Protocol](https://arqon.ai/docs/protocol/#commands-reference). These functions take a `data` object as a parameter and return a promise to the relevant response data (if any).
+Both command handlers contain functions named for the various command types in the Arqon Maestro protocol. These functions take a `data` object as a parameter and return a promise to the relevant response data (if any).
 
 ### Editors
 

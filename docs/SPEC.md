@@ -91,6 +91,7 @@ maestro-chrome-extension/
 ### 3.3 extension-command-handler.ts (Browser API Commands)
 
 Handles commands that require browser API access:
+
 - `COMMAND_TYPE_CLOSE_TAB` - Close current tab
 - `COMMAND_TYPE_CREATE_TAB` - Create new tab
 - `COMMAND_TYPE_DUPLICATE_TAB` - Duplicate current tab
@@ -102,6 +103,7 @@ Handles commands that require browser API access:
 ### 3.4 injected-command-handler.ts (Page Content Commands)
 
 Handles commands that interact with page content. For the public beta, the production-supported subset is:
+
 - **Navigation**: `COMMAND_TYPE_BACK`, `COMMAND_TYPE_FORWARD`
 - **Overlays**: `COMMAND_TYPE_SHOW` - Show links/inputs/code overlays
 - **Overlay selection**: `COMMAND_TYPE_USE`, `COMMAND_TYPE_CANCEL`
@@ -111,12 +113,14 @@ Additional injected-page commands still exist for compatibility and experimental
 ### 3.5 editors.ts (Editor Integrations)
 
 Supports multiple web-based code editors:
+
 - **Ace Editor** - Full implementation
 - **CodeMirror** - Full implementation  
 - **Monaco Editor** - Full implementation (used in VS Code web)
 - **Native Input** - textarea and input elements
 
 Each editor implements:
+
 - `active()` - Check if editor is active
 - `getEditorState()` - Get source, cursor, filename
 - `setSelection()` - Set text selection
@@ -126,6 +130,7 @@ Each editor implements:
 ### 3.6 popup.ts (Popup UI)
 
 Popup and side panel operator UX with:
+
 - Connection ledger
 - Active page intelligence
 - Last action trace
@@ -175,6 +180,7 @@ When user says `show links`, `show inputs`, or `show code`:
 ### 5.2 Overlay Selection
 
 For the public beta, element selection is expected to flow through overlays:
+
 1. `COMMAND_TYPE_SHOW` renders numbered overlays
 2. `COMMAND_TYPE_USE` activates the chosen overlay target
 3. `COMMAND_TYPE_CANCEL` clears the overlay state
