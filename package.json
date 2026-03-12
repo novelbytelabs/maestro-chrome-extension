@@ -1,18 +1,18 @@
 {
   "name": "arqon-maestro-chrome",
-  "version": "2.0.3",
-  "description": "Code with voice. Learn more at https://arqon.ai.",
+  "version": "2.0.4",
+  "description": "Chrome-first browser control for Arqon Maestro public beta.",
   "main": "dist/index.js",
-  "author": "Arqon Labs, Inc. <contact@arqon.ai>",
+  "author": "NovelByte Labs <contact@novelbytelabs.com>",
   "keywords": ["voice", "accessibility"],
   "license": "MIT",
-  "homepage": "https://arqon.ai",
+  "homepage": "https://novelbytelabs.github.io/maestro-chrome-extension/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/arqonai/chrome.git"
+    "url": "git+https://github.com/novelbytelabs/maestro-chrome-extension.git"
   },
   "bugs": {
-    "url": "https://github.com/arqonai/chrome/issues"
+    "url": "https://github.com/novelbytelabs/maestro-chrome-extension/issues"
   },
   "scripts": {
     "build": "webpack --mode development",

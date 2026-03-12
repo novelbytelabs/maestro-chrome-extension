@@ -1,4 +1,4 @@
-import { OperatorSnapshot } from "./operator-snapshot";
+import { createOperatorSnapshot, OperatorSnapshot } from "./operator-snapshot";
 
 const docsButton = document.getElementById("docs") as HTMLButtonElement;
 const reconnectButton = document.getElementById("reconnect") as HTMLButtonElement;
@@ -27,20 +27,40 @@ const lastActionLatency = document.getElementById("lastActionLatency") as HTMLSp
 const lastActionError = document.getElementById("lastActionError") as HTMLParagraphElement;
 
 const diagnosticsContent = document.getElementById("diagnosticsContent") as HTMLDivElement;
-const futureTeachMode = document.getElementById("futureTeachMode") as HTMLSpanElement;
-const futureDryRun = document.getElementById("futureDryRun") as HTMLSpanElement;
-const futureSiteProfiles = document.getElementById("futureSiteProfiles") as HTMLSpanElement;
-const futureMemory = document.getElementById("futureMemory") as HTMLSpanElement;
-
 let refreshTimer: number | undefined;
 let reconnectInFlight = false;
 
-function titleCase(value: string) {
+function titleCase(value?: string | null) {
+  if (!value) {
+    return "Unknown";
+  }
+
   return value
     .split(/[_-\s]+/)
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function normalizeSnapshot(snapshot: Partial<OperatorSnapshot> | undefined | null): OperatorSnapshot {
+  const base = createOperatorSnapshot();
+  if (!snapshot) {
+    return base;
+  }
+
+  return {
+    ...base,
+    ...snapshot,
+    connection: { ...base.connection, ...(snapshot.connection || {}) },
+    targeting: { ...base.targeting, ...(snapshot.targeting || {}) },
+    activePage: { ...base.activePage, ...(snapshot.activePage || {}) },
+    lastAction: { ...base.lastAction, ...(snapshot.lastAction || {}) },
+    diagnostics: { ...base.diagnostics, ...(snapshot.diagnostics || {}) },
+    sitePolicy: { ...base.sitePolicy, ...(snapshot.sitePolicy || {}) },
+    future: { ...base.future, ...(snapshot.future || {}) },
+    history: Array.isArray(snapshot.history) ? snapshot.history : base.history,
+    lifecycle: Array.isArray(snapshot.lifecycle) ? snapshot.lifecycle : base.lifecycle,
+  };
 }
 
 function relativeTime(timestamp: number | null) {
@@ -160,20 +180,12 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
   }
 }
 
-function renderFutureSurface(snapshot: OperatorSnapshot) {
-  futureTeachMode.textContent = titleCase(snapshot.future.teachMode);
-  futureDryRun.textContent = titleCase(snapshot.future.dryRun);
-  futureSiteProfiles.textContent = titleCase(snapshot.future.siteProfiles);
-  futureMemory.textContent = `${titleCase(snapshot.future.semanticMemory)} • ${snapshot.future.rememberedCommandsCount} traces`;
-}
-
 function renderSnapshot(snapshot: OperatorSnapshot) {
   renderMode(snapshot);
   setConnectionStatus(snapshot);
   renderActivePage(snapshot);
   renderLastAction(snapshot);
   renderDiagnostics(snapshot);
-  renderFutureSurface(snapshot);
 }
 
 function fetchSnapshot() {
@@ -186,7 +198,7 @@ function fetchSnapshot() {
       return;
     }
 
-    renderSnapshot(response as OperatorSnapshot);
+    renderSnapshot(normalizeSnapshot(response as Partial<OperatorSnapshot>));
   });
 }
 
@@ -207,7 +219,9 @@ function refreshOverlayPolicy() {
 
     showClickablesCheckbox.disabled = false;
     showClickablesCheckbox.checked = Boolean(response.enabled);
-    overlayPolicyCopy.textContent = response.enabled
+    overlayPolicyCopy.textContent = response.blockedByPolicy
+      ? "Blocked by policy on sensitive domains. Use explicit overlay commands instead."
+      : response.enabled
       ? "Enabled only for the current tab. Overlays will follow focus on this tab."
       : "Selective policy for the current active tab only.";
   });
@@ -314,7 +328,9 @@ showClickablesCheckbox.addEventListener("change", () => {
 
       showClickablesCheckbox.checked = Boolean(response.enabled);
       showClickablesCheckbox.disabled = false;
-      overlayPolicyCopy.textContent = response.enabled
+      overlayPolicyCopy.textContent = response.blockedByPolicy
+        ? "Blocked by policy on sensitive domains. Use explicit overlay commands instead."
+        : response.enabled
         ? "Enabled only for the current tab. Overlays will follow focus on this tab."
         : "Selective policy for the current active tab only.";
     }

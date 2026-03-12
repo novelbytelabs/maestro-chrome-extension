@@ -43,8 +43,14 @@ theme:
 
 nav:
   - Overview: index.md
+  - Supported Commands: SUPPORTED_COMMANDS.md
+  - Production Readiness Checklist: PRODUCTION_READINESS_CHECKLIST.md
+  - Command QA Matrix: COMMAND_QA_MATRIX.md
+  - Site Compatibility Sweep: SITE_COMPATIBILITY_SWEEP.md
+  - Chrome Web Store Listing: CHROME_WEB_STORE_LISTING.md
   - Local Runbook: LOCAL_RUNBOOK.md
   - Phase 3 Runbook: PHASE3_RUNBOOK.md
+  - Troubleshooting: TROUBLESHOOTING.md
   - Technical Specification: SPEC.md
   - Implementation Plan: IMPLEMENTATION_PLAN.md
 
@@ -99,7 +105,7 @@ extra_css:
 
 # Extra configuration
 extra:
-  version: "0.2.0-alpha.1 (planned)"
+  version: "2.0.3"
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/novelbytelabs/arqonbus

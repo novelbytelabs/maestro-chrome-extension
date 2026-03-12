@@ -17,6 +17,18 @@ let overlayPolicyLoaded = false;
 const overlayCooldownMs = 1500;
 const lastOverlayApplyAtByTabId: { [tabId: number]: number } = {};
 
+const isSensitiveTab = (tab?: chrome.tabs.Tab) => {
+  const raw = tab?.url || "";
+  try {
+    const hostname = new URL(raw).hostname;
+    return /(^|\.)((auth|login|signin|account|identity|checkout|billing|pay|bank|wallet|admin|secure|oauth|sso)(\.|$))/i.test(
+      hostname
+    );
+  } catch (_error) {
+    return false;
+  }
+};
+
 const ensureOverlayPolicyLoaded = async () => {
   if (overlayPolicyLoaded) {
     return;
@@ -213,18 +225,36 @@ const overlayPolicyEnabledForTab = async (tabId?: number) => {
 
 const setOverlayPolicyForTab = async (tabId: number, enabled: boolean) => {
   await ensureOverlayPolicyLoaded();
+  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  if (enabled && isSensitiveTab(tab)) {
+    ipc.noteOverlayPolicy(tabId, false);
+    return {
+      ok: false,
+      error: "Overlay auto-show is blocked by site policy on sensitive domains.",
+      blockedByPolicy: true,
+    };
+  }
   if (enabled) {
     overlayPolicyTabIds.add(tabId);
   } else {
     overlayPolicyTabIds.delete(tabId);
   }
   await persistOverlayPolicy();
+  ipc.noteOverlayPolicy(tabId, enabled);
+  return { ok: true, enabled };
 };
 
 const applyOverlayPolicyToTab = async (tabId: number, force: boolean = false) => {
   await ensureOverlayPolicyLoaded();
   if (!overlayPolicyTabIds.has(tabId)) {
     return { ok: false, skipped: true };
+  }
+  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  if (isSensitiveTab(tab)) {
+    overlayPolicyTabIds.delete(tabId);
+    await persistOverlayPolicy();
+    ipc.noteOverlayPolicy(tabId, false);
+    return { ok: false, blockedByPolicy: true, error: "Overlay auto-show is blocked by site policy on sensitive domains." };
   }
   const now = Date.now();
   if (!force && lastOverlayApplyAtByTabId[tabId] && now - lastOverlayApplyAtByTabId[tabId] < overlayCooldownMs) {
@@ -245,7 +275,10 @@ const refreshOverlayPolicyForActiveTab = async (force: boolean = false) => {
   if (!tab?.id) {
     return;
   }
-  if (await overlayPolicyEnabledForTab(tab.id)) {
+  const enabled = await overlayPolicyEnabledForTab(tab.id);
+  const blockedByPolicy = isSensitiveTab(tab);
+  ipc.noteOverlayPolicy(tab.id, blockedByPolicy ? false : enabled);
+  if (enabled) {
     await applyOverlayPolicyToTab(tab.id, force);
   }
 };
@@ -441,10 +474,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type == "get-overlay-policy") {
     activeNormalTab()
       .then(async (tab) => {
+        const enabled = await overlayPolicyEnabledForTab(tab?.id);
+        const blockedByPolicy = isSensitiveTab(tab);
+        if (tab?.id) {
+          ipc.noteOverlayPolicy(tab.id, blockedByPolicy ? false : enabled);
+        }
         sendResponse({
           ok: true,
           tabId: tab?.id,
-          enabled: await overlayPolicyEnabledForTab(tab?.id),
+          enabled: blockedByPolicy ? false : enabled,
+          blockedByPolicy,
         });
       })
       .catch((error) => {
@@ -461,7 +500,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
         const enabled = Boolean(message.enabled);
-        await setOverlayPolicyForTab(tab.id, enabled);
+        const result = await setOverlayPolicyForTab(tab.id, enabled);
+        if (!result.ok) {
+          sendResponse(Object.assign({ ok: false, tabId: tab.id, enabled: false }, result));
+          return;
+        }
         if (enabled) {
           await applyOverlayPolicyToTab(tab.id, true);
         } else {

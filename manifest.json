@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Arqon Maestro",
   "version": "2.0.4",
-  "description": "Code with voice. Learn more at https://arqon.ai.",
+  "description": "Chrome-first browser control for the Arqon Maestro public beta.",
   "permissions": ["background", "tabs", "storage", "alarms", "idle", "scripting", "webNavigation", "sidePanel"],
   "host_permissions": ["*://*/*"],
   "action": {

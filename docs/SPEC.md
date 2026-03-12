@@ -78,7 +78,7 @@ maestro-chrome-extension/
 - Manages WebSocket connection via IPC class
 - Handles keep-alive for service worker
 - Listens to browser events (tab activation, window focus, idle state)
-- Detects browser type: Chrome, Edge, Brave
+- Public beta support target: Chrome-first
 
 ### 3.2 ipc.ts (Communication Layer)
 
@@ -101,13 +101,12 @@ Handles commands that require browser API access:
 
 ### 3.4 injected-command-handler.ts (Page Content Commands)
 
-Handles commands that interact with page content:
+Handles commands that interact with page content. For the public beta, the production-supported subset is:
 - **Navigation**: `COMMAND_TYPE_BACK`, `COMMAND_TYPE_FORWARD`
-- **Click**: `COMMAND_TYPE_CLICK` - Click by text or number
 - **Overlays**: `COMMAND_TYPE_SHOW` - Show links/inputs/code overlays
-- **Editor**: `COMMAND_TYPE_GET_EDITOR_STATE`, `COMMAND_TYPE_UNDO`, `COMMAND_TYPE_REDO`
-- **Scroll**: `COMMAND_TYPE_SCROLL` - Scroll directions or to element
-- **DOM**: `COMMAND_TYPE_DOM_FOCUS`, `COMMAND_TYPE_DOM_BLUR`, `COMMAND_TYPE_DOM_CLICK`, `COMMAND_TYPE_DOM_COPY`, `COMMAND_TYPE_DOM_SCROLL`
+- **Overlay selection**: `COMMAND_TYPE_USE`, `COMMAND_TYPE_CANCEL`
+
+Additional injected-page commands still exist for compatibility and experimental paths, but they are not part of the public beta contract.
 
 ### 3.5 editors.ts (Editor Integrations)
 
@@ -126,10 +125,12 @@ Each editor implements:
 
 ### 3.6 popup.ts (Popup UI)
 
-Simple popup with:
-- "Show clickables" checkbox
-- Documentation link
-- Reconnect button
+Popup and side panel operator UX with:
+- Connection ledger
+- Active page intelligence
+- Last action trace
+- Diagnostics
+- Tab-scoped overlay policy
 
 ---
 
@@ -160,7 +161,7 @@ const URL = "ws://localhost:9100/";
 
 ### 5.1 How It Works
 
-When user says `links`, `inputs`, `code`, or `all`:
+When user says `show links`, `show inputs`, `show code`, or `show all`:
 
 1. `COMMAND_TYPE_SHOW` is invoked
 2. Selector is built based on element type:
@@ -171,13 +172,12 @@ When user says `links`, `inputs`, `code`, or `all`:
 3. Elements in viewport are found
 4. Numbered overlays are rendered
 
-### 5.2 Click-by-Text
+### 5.2 Overlay Selection
 
-When user says `click <text>`:
-1. XPath is used to find matching elements
-2. If single match: auto-click
-3. If multiple matches: show overlays for selection
-4. If number is spoken: click corresponding overlay
+For the public beta, element selection is expected to flow through overlays:
+1. `COMMAND_TYPE_SHOW` renders numbered overlays
+2. `COMMAND_TYPE_USE` activates the chosen overlay target
+3. `COMMAND_TYPE_CANCEL` clears the overlay state
 
 ---
 
@@ -189,10 +189,10 @@ When user says `click <text>`:
 |------|--------|
 | Extension Name | ✅ "Arqon Maestro" |
 | Popup Title | ✅ "Arqon Maestro for Chrome" |
-| Description | ✅ "Code with voice. Learn more at https://arqon.ai." |
+| Description | ✅ Chrome-first browser control for the Arqon Maestro public beta |
 | Package Name | ✅ "arqon-maestro-chrome" |
-| Author | ✅ "Arqon Labs, Inc." |
-| Repository | ✅ "https://github.com/arqonai/chrome.git" |
+| Author | ✅ "NovelByte Labs" |
+| Repository | ✅ "https://github.com/novelbytelabs/maestro-chrome-extension.git" |
 
 ### 6.2 Completed
 

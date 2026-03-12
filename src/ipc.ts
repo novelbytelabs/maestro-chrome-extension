@@ -52,6 +52,7 @@ export default class IPC {
   private persistedLoaded: boolean = false;
   private snapshot: OperatorSnapshot = createOperatorSnapshot();
   private lastAnalyzeAtByTabId: { [tabId: number]: number } = {};
+  private overlayPolicyByTabId: { [tabId: number]: boolean } = {};
 
   constructor(app: string, extensionCommandHandler: ExtensionCommandHandler) {
     this.app = app;
@@ -135,18 +136,49 @@ export default class IPC {
 
   private syncSitePolicyState() {
     const hostname = this.snapshot.activePage.hostname || "";
-    const sensitiveDomain =
-      /(^|\\.)(bank|billing|pay|stripe|paypal|auth|login|account)(\\.|$)/i.test(hostname);
+    const sensitiveDomain = this.isSensitiveHostname(hostname);
+    const overlayEnabled =
+      this.snapshot.activePage.tabId !== null ? Boolean(this.overlayPolicyByTabId[this.snapshot.activePage.tabId]) : false;
 
     this.snapshot.sitePolicy = Object.assign({}, this.snapshot.sitePolicy, {
       domain: hostname,
       scope: "tab",
-      overlayPolicy: "disabled",
-      automationPolicy: this.snapshot.mode,
+      overlayPolicy: sensitiveDomain ? "disabled" : overlayEnabled ? "tab-scoped" : "disabled",
+      automationPolicy: sensitiveDomain ? "assist" : this.snapshot.mode,
       sensitiveDomain,
       teachModeAllowed: !sensitiveDomain,
       dryRunRecommended: sensitiveDomain || this.snapshot.activePage.pageType == "dashboard",
     });
+  }
+
+  private isSensitiveHostname(hostname: string): boolean {
+    if (!hostname) {
+      return false;
+    }
+
+    return /(^|\.)((auth|login|signin|account|identity|checkout|billing|pay|bank|wallet|admin|secure|oauth|sso)(\.|$))/i.test(
+      hostname
+    );
+  }
+
+  private isPolicyBlockedCommand(commandType: string): boolean {
+    return [
+      "COMMAND_TYPE_USE",
+      "COMMAND_TYPE_CLICK",
+      "COMMAND_TYPE_DOM_CLICK",
+      "COMMAND_TYPE_DOM_FOCUS",
+      "COMMAND_TYPE_DOM_BLUR",
+      "COMMAND_TYPE_DIFF",
+      "COMMAND_TYPE_SELECT",
+    ].includes(commandType);
+  }
+
+  noteOverlayPolicy(tabId: number, enabled: boolean) {
+    this.overlayPolicyByTabId[tabId] = enabled;
+    if (this.snapshot.activePage.tabId == tabId) {
+      this.syncSitePolicyState();
+      this.persistSnapshotFragments();
+    }
   }
 
   private recordLifecycle(kind: LifecycleEvent["kind"], detail: string) {
@@ -752,6 +784,15 @@ export default class IPC {
     }
   }
 
+  private policyBlockedResponse(commandType: string, label: string) {
+    return {
+      ok: false,
+      error: `Blocked by site policy on sensitive domain: ${label}`,
+      blockedByPolicy: true,
+      commandType,
+    };
+  }
+
   private async sendToTab(tabId: number, message: any): Promise<any> {
     return new Promise((resolve) => {
       chrome.tabs.sendMessage(tabId, message, (response) => {
@@ -1051,6 +1092,11 @@ export default class IPC {
         const startedAt = Date.now();
         const navigationSequence = this.extractNavigationSequence(commands, i);
         const capability = commandCapability(String(command?.type || ""));
+        const effectiveCommandType = navigationSequence
+          ? navigationSequence.createTab
+            ? "COMPAT_OPEN_SITE_NEW_TAB"
+            : "COMPAT_OPEN_SITE"
+          : String(command?.type || "unknown");
         let route: DispatchRoute = capability ? capability.route : "unknown";
         let error: string | null = null;
         let targetTabId: number | null = this.snapshot.targeting.lastResolvedTabId;
@@ -1060,6 +1106,12 @@ export default class IPC {
         let normalizedPayload = this.normalizePayload(command);
 
         try {
+          const sensitiveDomain = this.snapshot.sitePolicy.sensitiveDomain;
+          if (sensitiveDomain && this.isPolicyBlockedCommand(effectiveCommandType)) {
+            handlerResponse = this.policyBlockedResponse(effectiveCommandType, label);
+          } else if (sensitiveDomain && command?.type == "COMMAND_TYPE_SHOW" && String(command?.text || "").toLowerCase() == "all") {
+            handlerResponse = this.policyBlockedResponse(String(command?.type || "unknown"), label);
+          } else {
           if (navigationSequence) {
             route = "browser-nav-compat";
             compatibilityPathUsed = true;
@@ -1132,6 +1184,7 @@ export default class IPC {
               });
             }
           }
+          }
         } catch (caughtError) {
           error = String(caughtError);
           handlerResponse = { ok: false, error };
@@ -1165,7 +1218,9 @@ export default class IPC {
           error,
           compatibilityPathUsed,
           legacyPathUsed: Boolean(capability?.legacy) || route == "injected" || compatibilityPathUsed,
-          degradationReason: this.degradationReason(capability, route, compatibilityPathUsed),
+          degradationReason: handlerResponse?.blockedByPolicy
+            ? "Command was blocked by conservative site policy on a sensitive domain."
+            : this.degradationReason(capability, route, compatibilityPathUsed),
         };
         this.pushTrace(trace);
       }

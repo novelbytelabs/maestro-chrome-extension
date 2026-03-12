@@ -1,12 +1,12 @@
 # Arqon Maestro Chrome Extension
 
-Source for the Arqon Maestro Chrome Extension.
+Chrome-first public beta source for the Arqon Maestro browser control layer.
 
 ## Installation
 
-1. Download `build.zip` and unzip
+1. Download `build.zip` and unzip it
 2. In Chrome, go to [chrome://extensions](chrome://extensions) and enable Developer Mode
-3. Click "Load unpacked" and select the unzipped `build` folder
+3. Click "Load unpacked" and select the unzipped extension directory that contains `manifest.json`, `build/`, and `img/`
 
 You may need to reload any tabs that were open before the extension was loaded.
 
@@ -47,7 +47,7 @@ We currently support editing text in `textarea` and `input` tags, as well as a f
 
 Supporting a new editor is a matter of implementing these functions.
 
-The `Editor` class also contains some helper functions to determine a suitable file name from a language name and to calculate a cursor position from the cursor row and column and vice versa. Third-party editors also have a private `editor()` method to capture the Javascript object corresponding to the editor from the page's global namespace, making the third-party API available.
+The `Editor` class also contains helper functions to determine a suitable file name from a language name and to calculate a cursor position from the cursor row and column and vice versa. Third-party editors also have a private `editor()` method to capture the Javascript object corresponding to the editor from the page's global namespace, making the third-party API available.
 
 ## Development
 
@@ -66,8 +66,17 @@ The `Editor` class also contains some helper functions to determine a suitable f
 
 For local startup after a reboot, see [docs/LOCAL_RUNBOOK.md](docs/LOCAL_RUNBOOK.md).
 
+For the public beta support contract, see:
+- [docs/SUPPORTED_COMMANDS.md](docs/SUPPORTED_COMMANDS.md)
+- [docs/PRODUCTION_READINESS_CHECKLIST.md](docs/PRODUCTION_READINESS_CHECKLIST.md)
+- [docs/COMMAND_QA_MATRIX.md](docs/COMMAND_QA_MATRIX.md)
+- [docs/SITE_COMPATIBILITY_SWEEP.md](docs/SITE_COMPATIBILITY_SWEEP.md)
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
 ## Deployment
 
 1. Update the version number in `manifest.json`
-2. Run `npm run dist`
-3. Upload the new `build.zip` file to the Chrome Web Store
+2. Run `npm run build`
+3. Run `npm run dist`
+4. Validate `build.zip`
+5. Upload the new `build.zip` file to the Chrome Web Store

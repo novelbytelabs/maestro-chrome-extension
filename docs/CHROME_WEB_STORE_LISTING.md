@@ -6,36 +6,39 @@
 **Arqon Maestro**
 
 ### Short Description (up to 132 characters)
-Code with voice. Control your browser hands-free with AI-powered voice commands.
+Chrome-first browser control for Arqon Maestro. Use voice commands for overlays, tabs, navigation, and diagnostics.
 
 ### Detailed Description
 
 ```
-Arqon Maestro - Voice-First Browser Control
+Arqon Maestro - Chrome Browser Control (Public Beta)
 
-Control your browser with voice commands using Arqon Maestro, the AI-powered voice assistant for web development and browsing.
+Arqon Maestro brings Chrome-first browser control to the Arqon Maestro desktop app.
 
-Features:
-• Voice-controlled navigation - "go to github.com", "scroll down", "click submit"
-• Click any element by speaking its text
-• Tab management - "open new tab", "next tab", "close tab"
-• Form filling via voice
-• Editor integration - Works with web-based code editors (Monaco, Ace, CodeMirror)
-• Hands-free web browsing for accessibility
+Public beta features:
+• Overlay commands - "show links", "show inputs", "show code", "use 1"
+• Tab control - "next tab", "switch tab two", "close tab", "duplicate tab"
+• Navigation - "back", "forward", "reload"
+• Site navigation - "go to google.com", "open new tab github.com"
+• Popup and side panel diagnostics for connection, routing, and lifecycle state
 
 How it works:
 1. Install the Chrome extension
-2. Run the Arqon Maestro desktop app
-3. Start speaking commands!
+2. Start Arqon Bus and the Arqon Maestro desktop app in local mode
+3. Use supported voice commands in Chrome
 
 Requirements:
-• Arqon Maestro desktop application (free download at arqon.ai)
+• Arqon Maestro desktop application
+• Arqon Bus local runtime
 • Microphone access
 
-Supported browsers: Chrome, Edge, Brave
+Public beta scope:
+• Chrome-first support
+• Conservative runtime behavior on sensitive domains
+• Explicit compatibility and limitation reporting in the extension UI
 
-Learn more: https://arqon.ai
-Support: https://arqon.ai/docs
+Learn more: https://novelbytelabs.github.io/ArqonMaestro/guides/getting-started/
+Support: https://novelbytelabs.github.io/maestro-chrome-extension/
 Privacy Policy: https://arqon.ai/privacy
 ```
 
@@ -60,11 +63,11 @@ Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 
 | # | Screenshot Name | Description | Dimensions |
 |---|----------------|-------------|------------|
-| 1 | popup-ui.png | Show the extension popup with Arqon Maestro branding | 1280x800 |
-| 2 | voice-command-demo.png | Demo voice command in action | 1280x800 |
-| 3 | overlays-demo.png | Show clickable overlays highlighted | 1280x800 |
-| 4 | editor-integration.png | Show voice control in a web editor | 1280x800 |
-| 5 | tab-management.png | Show tab management commands | 1280x800 |
+| 1 | popup-ui.png | Popup showing connection ledger and active page state | 1280x800 |
+| 2 | sidepanel-ui.png | Side panel showing execution ledger and diagnostics | 1280x800 |
+| 3 | overlays-demo.png | `show links` overlay command in action | 1280x800 |
+| 4 | navigation-demo.png | `go to <site>` and tab navigation behavior | 1280x800 |
+| 5 | policy-demo.png | Sensitive-domain policy posture and blocked overlay toggle | 1280x800 |
 
 ### 3. Promotional Images (Optional but recommended)
 
@@ -82,10 +85,8 @@ Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 - `img/icon_disconnected/128x128.png` - Disconnected state icon
 
 ### Logos (in `docs/assets/`)
-- `logo_transparent.png` - Full logo with transparent background
-- `logo_consistent_final.png` - Consistent branding logo
-- `symbol_fixed.png` - Symbol/logo mark only
-- `arqon_a.png` - Arqon "A" symbol
+- `docs/assets/symbol.png` - Current symbol asset
+- `docs/assets/favicon.ico` - Favicon / small brand mark
 
 ---
 
@@ -100,6 +101,7 @@ Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 - [ ] Set category: Developer Tools
 - [ ] Add privacy policy URL
 - [ ] Verify extension works in Chrome
+- [ ] Verify listing copy matches `docs/SUPPORTED_COMMANDS.md`
 - [ ] Submit for review
 
 ---
@@ -116,9 +118,10 @@ Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 
 ## Version Notes
 
-Current extension version: `2.0.3` (see `package.json`)
+Current extension version: `2.0.4` (see `manifest.json`)
 
 When updating:
-1. Increment version in `package.json`
-2. Run `npm run dist` to rebuild
-3. Upload new zip to developer dashboard
+1. Increment version in `manifest.json`
+2. Run `npm run build`
+3. Run `npm run dist`
+4. Upload the new zip to the developer dashboard
