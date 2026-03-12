@@ -100,8 +100,16 @@ function renderActivePage(snapshot: OperatorSnapshot) {
 }
 
 function renderMode(snapshot: OperatorSnapshot) {
-  panelModeSelect.value = snapshot.mode;
-  panelModePolicyNote.textContent = snapshot.modePolicy.note;
+  panelModeSelect.value = snapshot.requestedMode || snapshot.mode;
+  if (snapshot.effectiveMode != snapshot.requestedMode) {
+    panelModePolicyNote.classList.add("policy-override-note");
+    panelModePolicyNote.textContent = `Effective on this page: ${titleCase(
+      snapshot.effectiveMode
+    )}. Requested: ${titleCase(snapshot.requestedMode)}. ${snapshot.modePolicy.note}`;
+  } else {
+    panelModePolicyNote.classList.remove("policy-override-note");
+    panelModePolicyNote.textContent = `${titleCase(snapshot.effectiveMode)} mode active. ${snapshot.modePolicy.note}`;
+  }
 }
 
 function renderHistoryItem(trace: CommandTrace) {

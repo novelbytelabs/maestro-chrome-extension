@@ -6,7 +6,7 @@
 **Arqon Maestro**
 
 ### Short Description (up to 132 characters)
-Chrome-first browser control for Arqon Maestro. Use voice commands for overlays, tabs, navigation, and diagnostics.
+Chrome-first browser control for Arqon Maestro public beta. Use voice commands for overlays, tabs, and navigation.
 
 ### Detailed Description
 
@@ -20,7 +20,7 @@ Public beta features:
 • Tab control - "next tab", "switch tab two", "close tab", "duplicate tab"
 • Navigation - "back", "forward", "reload"
 • Site navigation - "go to google.com", "open github.com"
-• Popup and side panel diagnostics for connection, routing, and lifecycle state
+• Popup and side panel visibility into connection, routing, policy, and lifecycle state
 
 How it works:
 1. Install the Chrome extension
@@ -36,6 +36,7 @@ Public beta scope:
 • Chrome-first support
 • Conservative runtime behavior on sensitive domains
 • Explicit compatibility and limitation reporting in the extension UI
+• On sensitive domains, explicit inspection commands may be allowed while action execution remains policy-limited
 
 Learn more: https://novelbytelabs.github.io/ArqonMaestro/guides/getting-started/
 Support: https://novelbytelabs.github.io/maestro-chrome-extension/
@@ -59,15 +60,17 @@ English (en)
 ### 2. Screenshots (1280x800 or 640x400)
 Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 
-**Recommended screenshots to create:**
+**Captured screenshot set:**
 
 | # | Screenshot Name | Description | Dimensions |
 |---|----------------|-------------|------------|
-| 1 | popup-ui.png | Popup showing connection ledger and active page state | 1280x800 |
-| 2 | sidepanel-ui.png | Side panel showing execution ledger and diagnostics | 1280x800 |
-| 3 | overlays-demo.png | `show links` overlay command in action | 1280x800 |
-| 4 | navigation-demo.png | `go to <site>` and tab navigation behavior | 1280x800 |
-| 5 | policy-demo.png | Sensitive-domain policy posture and blocked overlay toggle | 1280x800 |
+| 1 | `tmp/screenshots/cws-01-popup-operator-deck.png` | Popup showing operator deck, connection ledger, and active page summary | 1280x800 |
+| 2 | `tmp/screenshots/cws-02-sidepanel-active-page-intelligence.png` | Side panel showing active page intelligence and diagnostics | 1280x800 |
+| 3 | `tmp/screenshots/cws-03-popup-connected-surface.png` | Popup showing connected runtime state and operator controls | 1280x800 |
+| 4 | `tmp/screenshots/cws-04-sidepanel-execution-ledger.png` | Side panel showing execution ledger with stable and compatibility-routed commands | 1280x800 |
+| 5 | `tmp/screenshots/cws-05-sensitive-page-policy-preview.png` | Sensitive-domain policy preview showing conservative posture | 1280x800 |
+| 6 | `tmp/screenshots/cws-06-popup-sensitive-policy-override.png` | Popup showing sensitive-page policy override from requested mode to effective mode | 1280x800 |
+| 7 | `tmp/screenshots/cws-07-link-overlays-normal-page.png` | Link overlays on a normal page using `show links` | 1280x800 |
 
 ### 3. Promotional Images (Optional but recommended)
 
@@ -83,6 +86,8 @@ Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 ### Icons (in project)
 - `img/icon_default/128x128.png` - Main icon (connected state)
 - `img/icon_disconnected/128x128.png` - Disconnected state icon
+- `img/icon_default/16x16.png`, `32x32.png`, `48x48.png` - Required extension icon sizes
+- `img/icon_disconnected/16x16.png`, `32x32.png`, `48x48.png` - Alternate state icon sizes
 
 ### Logos (in `docs/assets/`)
 - `docs/assets/symbol.png` - Current symbol asset
@@ -92,17 +97,17 @@ Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 
 ## Store Setup Checklist
 
-- [ ] Create Chrome Web Store developer account ($5)
-- [ ] Upload 128x128 icon
-- [ ] Write short description (≤132 chars)
-- [ ] Write detailed description
-- [ ] Create/upload screenshots (1280x800 recommended)
+- [x] Create Chrome Web Store developer account ($5)
+- [x] Upload 128x128 icon
+- [x] Write short description (≤132 chars)
+- [x] Write detailed description
+- [x] Create/upload screenshots (1280x800 recommended)
 - [ ] Add promotional images (optional)
-- [ ] Set category: Developer Tools
-- [ ] Add privacy policy URL
+- [x] Set category: Developer Tools
+- [x] Add privacy policy URL
 - [ ] Verify extension works in Chrome
 - [ ] Verify listing copy matches `docs/SUPPORTED_COMMANDS.md`
-- [ ] Submit for review
+- [x] Submit for review
 
 ---
 
@@ -121,6 +126,7 @@ Chrome Web Store requires at least 1 screenshot. Recommended: 5-8 screenshots.
 Current extension version: `2.0.4` (see `manifest.json`)
 
 When updating:
+
 1. Increment version in `manifest.json`
 2. Run `npm run build`
 3. Run `npm run dist`

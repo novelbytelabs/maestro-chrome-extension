@@ -143,6 +143,8 @@ export interface ModePolicy {
 
 export interface OperatorSnapshot {
   mode: OperatorMode;
+  requestedMode: OperatorMode;
+  effectiveMode: OperatorMode;
   connection: ConnectionState;
   targeting: {
     preferredTabId: number | null;
@@ -208,6 +210,8 @@ export function emptyActivePageSummary(): ActivePageSummary {
 export function createOperatorSnapshot(): OperatorSnapshot {
   return {
     mode: "pilot",
+    requestedMode: "pilot",
+    effectiveMode: "pilot",
     connection: {
       busConnected: false,
       workerSessionStartedAt: Date.now(),

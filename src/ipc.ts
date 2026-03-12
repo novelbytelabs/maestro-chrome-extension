@@ -15,6 +15,7 @@ import {
   ResolvedTarget,
   TargetResolutionState,
 } from "./operator-snapshot";
+import { isSensitiveUrl } from "./sensitive-url";
 
 export default class IPC {
   private static readonly preferredTabStorageKey = "preferredTabId";
@@ -85,6 +86,7 @@ export default class IPC {
       const storedMode = stored[IPC.modeStorageKey];
       if (storedMode == "observe" || storedMode == "assist" || storedMode == "pilot" || storedMode == "locked") {
         this.snapshot.mode = storedMode;
+        this.snapshot.requestedMode = storedMode;
       }
 
       if (Array.isArray(stored[IPC.historyStorageKey])) {
@@ -150,6 +152,7 @@ export default class IPC {
 
   private syncModePolicyState() {
     const effectiveMode = this.snapshot.sitePolicy.automationPolicy;
+    this.snapshot.effectiveMode = effectiveMode;
     if (effectiveMode == "locked") {
       this.snapshot.modePolicy = {
         commandExecution: "blocked",
@@ -194,7 +197,7 @@ export default class IPC {
 
   private syncSitePolicyState() {
     const hostname = this.snapshot.activePage.hostname || "";
-    const sensitiveDomain = this.isSensitiveHostname(hostname);
+    const sensitiveDomain = this.isSensitivePage(this.snapshot.activePage.url, hostname);
     const overlayEnabled =
       this.snapshot.activePage.tabId !== null ? Boolean(this.overlayPolicyByTabId[this.snapshot.activePage.tabId]) : false;
 
@@ -210,14 +213,8 @@ export default class IPC {
     this.syncModePolicyState();
   }
 
-  private isSensitiveHostname(hostname: string): boolean {
-    if (!hostname) {
-      return false;
-    }
-
-    return /(^|\.)((auth|login|signin|account|identity|checkout|billing|pay|bank|wallet|admin|secure|oauth|sso)(\.|$))/i.test(
-      hostname
-    );
+  private isSensitivePage(url: string, hostname: string): boolean {
+    return isSensitiveUrl(url) || isSensitiveUrl(hostname ? `https://${hostname}/` : "");
   }
 
   private isPolicyBlockedCommand(commandType: string): boolean {
@@ -287,6 +284,7 @@ export default class IPC {
   async setMode(mode: OperatorSnapshot["mode"]): Promise<OperatorSnapshot["mode"]> {
     await this.ensurePersistedStateLoaded();
     this.snapshot.mode = mode;
+    this.snapshot.requestedMode = mode;
     this.syncSitePolicyState();
     this.persistSnapshotFragments();
     return this.snapshot.mode;

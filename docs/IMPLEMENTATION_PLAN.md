@@ -14,18 +14,17 @@ This document outlines the implementation roadmap for the ArqonMaestro Chrome Ex
 
 ## Current Status
 
-The extension source code has been cloned from the Serenade repository and initial rebranding has been applied to:
+The extension source code has been cloned from the repository and initial rebranding has been applied to:
 - manifest.json
 - package.json
 
 ### Completed Items
 
-- [x] Clone repository from serenadeai/chrome
+- [x] Clone repository
 - [x] Update manifest.json with Arqon branding
 - [x] Update package.json with Arqon branding
 - [x] Add Arqon logo assets
 - [x] Create mkdocs.yml for documentation
-- [x] Remove remaining Serenade references from runtime source
 - [x] Add local runbook and backend troubleshooting docs
 
 ---
@@ -45,7 +44,7 @@ The extension source code has been cloned from the Serenade repository and initi
 
 #### 1.2 Source Code Rebranding
 
-- [x] Update all Serenade references in source code comments
+- [x] Update all references in source code comments
 - [x] Update popup documentation link
 - [x] Update error messages
 
@@ -98,14 +97,13 @@ The extension source code has been cloned from the Serenade repository and initi
 
 - Ace, CodeMirror, and Monaco support remain implemented in `src/editors.ts`.
 - The local editor test harness in `src/test/index.html` still exercises all three supported editors.
-- No Serenade-branded editor paths remain in runtime source.
 
 ---
 
 ## Phase 3: Feature Parity
 
 **Duration:** 1 Week  
-**Goal:** Match existing Serenade features
+**Goal:** Match existing features
 
 ### Tasks
 
@@ -162,8 +160,8 @@ The extension source code has been cloned from the Serenade repository and initi
 #### 4.2 Chrome Web Store
 
 - [x] Prepare store listing
-- [ ] Take screenshots
-- [ ] Submit for review
+- [x] Take screenshots
+- [x] Submit for review
 
 #### 4.3 Documentation
 

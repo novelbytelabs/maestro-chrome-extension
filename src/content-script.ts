@@ -25,6 +25,7 @@ try {
 const contentOverlayIds = new Set<string>();
 let overlayClearTimeout: number | undefined;
 let contentOverlayEntries: { node: HTMLElement; type: string }[] = [];
+let overlayPersistenceMode: "timed" | "policy" = "timed";
 
 type PageType = "editor" | "form" | "dashboard" | "docs" | "generic" | "unknown";
 type FocusedTarget =
@@ -103,6 +104,7 @@ function clearContentOverlays() {
     window.clearTimeout(overlayClearTimeout);
     overlayClearTimeout = undefined;
   }
+  overlayPersistenceMode = "timed";
   for (const id of Array.from(contentOverlayIds)) {
     document.getElementById(id)?.remove();
   }
@@ -111,9 +113,14 @@ function clearContentOverlays() {
   document.getElementById("arqon-copy-overlay")?.remove();
 }
 
-function scheduleOverlayClear() {
+function scheduleOverlayClear(persistent: boolean) {
+  overlayPersistenceMode = persistent ? "policy" : "timed";
   if (overlayClearTimeout !== undefined) {
     window.clearTimeout(overlayClearTimeout);
+    overlayClearTimeout = undefined;
+  }
+  if (persistent) {
+    return;
   }
   overlayClearTimeout = window.setTimeout(() => {
     clearContentOverlays();
@@ -131,7 +138,11 @@ function inViewport(element: HTMLElement) {
   );
 }
 
-function showContentOverlays(nodes: HTMLElement[], overlayType: string) {
+function showContentOverlays(
+  nodes: HTMLElement[],
+  overlayType: string,
+  options: { persistent?: boolean } = {}
+) {
   clearContentOverlays();
   contentOverlayEntries = nodes.map((node) => ({
     node,
@@ -166,7 +177,7 @@ function showContentOverlays(nodes: HTMLElement[], overlayType: string) {
     (document.body || document.documentElement).appendChild(overlay);
     contentOverlayIds.add(id);
   }
-  scheduleOverlayClear();
+  scheduleOverlayClear(Boolean(options.persistent));
 }
 
 function clickNode(node: HTMLElement) {
@@ -351,13 +362,16 @@ function handleShowCommand(data: any) {
   }
 
   const nodes = collectVisible(selector);
-  showContentOverlays(nodes, target);
+  showContentOverlays(nodes, target, {
+    persistent: Boolean(data?.persistent),
+  });
   return {
     ok: true,
     overlayType: target,
     count: nodes.length,
     path: "content-script-direct",
     location: window.location.href,
+    persistent: Boolean(data?.persistent),
     received: data,
   };
 }

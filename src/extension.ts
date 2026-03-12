@@ -1,5 +1,6 @@
 import ExtensionCommandHandler from "./extension-command-handler";
 import IPC from "./ipc";
+import { isSensitiveUrl } from "./sensitive-url";
 
 const extensionCommandHandler = new ExtensionCommandHandler();
 const ipc = new IPC(
@@ -18,15 +19,7 @@ const overlayCooldownMs = 1500;
 const lastOverlayApplyAtByTabId: { [tabId: number]: number } = {};
 
 const isSensitiveTab = (tab?: chrome.tabs.Tab) => {
-  const raw = tab?.url || "";
-  try {
-    const hostname = new URL(raw).hostname;
-    return /(^|\.)((auth|login|signin|account|identity|checkout|billing|pay|bank|wallet|admin|secure|oauth|sso)(\.|$))/i.test(
-      hostname
-    );
-  } catch (_error) {
-    return false;
-  }
+  return isSensitiveUrl(tab?.url);
 };
 
 const ensureOverlayPolicyLoaded = async () => {
@@ -282,6 +275,7 @@ const applyOverlayPolicyToTab = async (tabId: number, force: boolean = false) =>
     data: {
       type: "COMMAND_TYPE_SHOW",
       text: "links",
+      persistent: true,
     },
   });
 };
@@ -415,6 +409,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     ipc.noteKeepAlive("Connection watchdog alarm fired.");
     await ensureConnection();
     await ipc.refreshActivePage(false);
+    await refreshOverlayPolicyForActiveTab(false);
   }
 });
 

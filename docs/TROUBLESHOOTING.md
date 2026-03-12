@@ -79,9 +79,3 @@ Most common causes:
 - Maestro not started in local mode
 - extension not reloaded after a rebuild
 - stale Chrome session after a code change
-
-## Remote Serenade endpoints fail TLS
-
-The extension beta assumes local mode.
-
-If you see `ERR_CERT_DATE_INVALID` for `serenade.ai`, that is outside the extension release path. Use local mode and the Arqon Bus local stack.

@@ -6,7 +6,7 @@ repo_name: novelbytelabs/maestro-chrome-extension
 edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: site
-dev_addr: 127.0.0.1:8090
+dev_addr: 127.0.0.1:8091
 
 theme:
   name: "material"

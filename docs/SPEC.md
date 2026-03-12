@@ -1,6 +1,6 @@
 # ArqonMaestro Chrome Extension Technical Specification
 
-**Version:** 2.0 (Rebrand from Serenade)  
+**Version:** 2.0 
 **Status:** Phase 1 and Phase 2 Complete  
 **Last Updated:** 2026-03-11
 
@@ -199,7 +199,7 @@ For the public beta, element selection is expected to flow through overlays:
 | Item | Status |
 |------|--------|
  | WebSocket URL | ✅ Updated to 9100 |
- | Source code references | ✅ All Serenade references removed |
+ | Source code references | ✅ All old branding references removed |
 
 ---
 

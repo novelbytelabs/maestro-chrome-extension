@@ -34,41 +34,41 @@ Use this checklist before every public beta release candidate.
 ## 4. Core Command QA
 
 - [ ] Complete `docs/COMMAND_QA_MATRIX.md`
-- [ ] Every production-supported command has a pass result or documented caveat
-- [ ] No production-supported command fails silently
-- [ ] Compatibility-routed commands are explicitly labeled in diagnostics
+- [x] Every production-supported command has a pass result or documented caveat
+- [x] No production-supported command fails silently
+- [x] Compatibility-routed commands are explicitly labeled in diagnostics
 
 ## 5. Sensitive-Page Policy Behavior
 
-- [ ] Open one auth/payment/admin-like page
-- [ ] Confirm overlay auto-show cannot be enabled there
-- [ ] Confirm policy preview shows conservative posture
-- [ ] Confirm blocked commands surface `blocked by policy` clearly in the UI/trace
-- [ ] Confirm explicit overlay commands still behave predictably where allowed
+- [x] Open one auth/payment/admin-like page
+- [x] Confirm overlay auto-show cannot be enabled there
+- [x] Confirm policy preview shows conservative posture
+- [x] Confirm blocked commands surface `blocked by policy` clearly in the UI/trace
+- [x] Confirm explicit overlay commands still behave predictably where allowed
 
 ## 6. Packaging and Install
 
-- [ ] `npm run build`
-- [ ] `npm run dist`
-- [ ] Verify `build.zip` contains `build/`, `img/`, and `manifest.json`
-- [ ] Load the extension from a clean Chrome profile
-- [ ] Confirm icons render in popup and extensions page
-- [ ] Confirm docs button opens the getting-started guide
+- [x] `npm run build`
+- [x] `npm run dist`
+- [x] Verify `build.zip` contains `build/`, `img/`, and `manifest.json`
+- [x] Load the extension from a clean Chrome profile
+- [x] Confirm icons render in popup and extensions page
+- [x] Confirm docs button opens the getting-started guide
 
 ## 7. Chrome Web Store Assets and Listing
 
-- [ ] Finalize `docs/CHROME_WEB_STORE_LISTING.md`
-- [ ] Capture at least 5 screenshots
-- [ ] Verify icon set and promotional assets exist
-- [ ] Verify store copy matches the production-supported command set
-- [ ] Verify listing copy states Chrome-first public beta
+- [x] Finalize `docs/CHROME_WEB_STORE_LISTING.md`
+- [x] Capture at least 5 screenshots
+- [x] Verify icon set and promotional assets exist
+- [x] Verify store copy matches the production-supported command set
+- [x] Verify listing copy states Chrome-first public beta
 
 ## 8. Final Release Sign-Off
 
-- [ ] One week of internal soak completed
-- [ ] No cold-start regressions observed
-- [ ] No overlay spam regressions observed
-- [ ] No reconnect dead-end regressions observed
-- [ ] No critical regressions in the supported command set
-- [ ] Beta version number updated in `manifest.json`
-- [ ] `build.zip` uploaded to Chrome Web Store dashboard
+- [x] One week of internal soak completed
+- [x] No cold-start regressions observed
+- [x] No overlay spam regressions observed
+- [x] No reconnect dead-end regressions observed
+- [x] No critical regressions in the supported command set
+- [x] Beta version number updated in `manifest.json`
+- [x] `build.zip` uploaded to Chrome Web Store dashboard

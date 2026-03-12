@@ -109,8 +109,16 @@ function setConnectionStatus(snapshot: OperatorSnapshot) {
 }
 
 function renderMode(snapshot: OperatorSnapshot) {
-  modeSelect.value = snapshot.mode;
-  modePolicyNote.textContent = snapshot.modePolicy.note;
+  modeSelect.value = snapshot.requestedMode || snapshot.mode;
+  if (snapshot.effectiveMode != snapshot.requestedMode) {
+    modePolicyNote.classList.add("policy-override-note");
+    modePolicyNote.textContent = `Effective on this page: ${titleCase(
+      snapshot.effectiveMode
+    )}. Requested: ${titleCase(snapshot.requestedMode)}. ${snapshot.modePolicy.note}`;
+  } else {
+    modePolicyNote.classList.remove("policy-override-note");
+    modePolicyNote.textContent = `${titleCase(snapshot.effectiveMode)} mode active. ${snapshot.modePolicy.note}`;
+  }
 }
 
 function renderActivePage(snapshot: OperatorSnapshot) {
