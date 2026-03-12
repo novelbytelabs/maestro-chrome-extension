@@ -3,11 +3,14 @@
   "name": "Arqon Maestro",
   "version": "2.0.4",
   "description": "Code with voice. Learn more at https://arqon.ai.",
-  "permissions": ["background", "tabs", "storage", "alarms", "idle", "scripting", "webNavigation"],
+  "permissions": ["background", "tabs", "storage", "alarms", "idle", "scripting", "webNavigation", "sidePanel"],
   "host_permissions": ["*://*/*"],
   "action": {
     "default_title": "Arqon Maestro for Chrome",
     "default_popup": "build/popup.html"
+  },
+  "side_panel": {
+    "default_path": "build/sidepanel.html"
   },
   "background": {
     "service_worker": "build/extension.js"

@@ -1,0 +1,222 @@
+import { CommandTrace, OperatorSnapshot } from "./operator-snapshot";
+
+const refreshButton = document.getElementById("refresh") as HTMLButtonElement;
+
+const pageSite = document.getElementById("pageSite") as HTMLSpanElement;
+const pageTitle = document.getElementById("pageTitle") as HTMLSpanElement;
+const pageType = document.getElementById("pageType") as HTMLSpanElement;
+const pageFocus = document.getElementById("pageFocus") as HTMLSpanElement;
+const countLinks = document.getElementById("countLinks") as HTMLSpanElement;
+const countButtons = document.getElementById("countButtons") as HTMLSpanElement;
+const countInputs = document.getElementById("countInputs") as HTMLSpanElement;
+const countCode = document.getElementById("countCode") as HTMLSpanElement;
+const pageFrames = document.getElementById("pageFrames") as HTMLSpanElement;
+const pageShadow = document.getElementById("pageShadow") as HTMLSpanElement;
+const pageInjection = document.getElementById("pageInjection") as HTMLSpanElement;
+const pageAnalyzed = document.getElementById("pageAnalyzed") as HTMLSpanElement;
+const policyDomain = document.getElementById("policyDomain") as HTMLSpanElement;
+
+const historyList = document.getElementById("historyList") as HTMLDivElement;
+const diagnosticsList = document.getElementById("diagnosticsList") as HTMLDivElement;
+
+let refreshTimer: number | undefined;
+
+function titleCase(value: string) {
+  return value
+    .split(/[_-\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function relativeTime(timestamp: number | null) {
+  if (!timestamp) {
+    return "n/a";
+  }
+  const deltaMs = Date.now() - timestamp;
+  if (deltaMs < 1000) {
+    return "just now";
+  }
+  const seconds = Math.floor(deltaMs / 1000);
+  if (seconds < 60) {
+    return `${seconds}s ago`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
+function renderActivePage(snapshot: OperatorSnapshot) {
+  const { activePage } = snapshot;
+  pageSite.textContent = activePage.hostname || "No active page";
+  pageTitle.textContent = activePage.title || "n/a";
+  pageType.textContent = titleCase(activePage.pageType);
+  pageFocus.textContent = titleCase(activePage.focusedTarget);
+  countLinks.textContent = String(activePage.actionableCounts.links);
+  countButtons.textContent = String(activePage.actionableCounts.buttons);
+  countInputs.textContent = String(activePage.actionableCounts.inputs);
+  countCode.textContent = String(activePage.actionableCounts.code);
+  pageFrames.textContent = String(activePage.frameCount);
+  pageShadow.textContent = activePage.shadowDomPresent ? "Yes" : "No";
+  pageInjection.textContent = titleCase(activePage.injectionHealth);
+  pageAnalyzed.textContent = relativeTime(activePage.analyzedAt);
+  policyDomain.textContent = activePage.hostname || "n/a";
+}
+
+function renderHistoryItem(trace: CommandTrace) {
+  const item = document.createElement("article");
+  item.className = "history-item";
+
+  const title = document.createElement("h3");
+  title.textContent = trace.label;
+  item.appendChild(title);
+
+  const route = document.createElement("p");
+  route.textContent = `Route: ${titleCase(trace.route)} • Result: ${titleCase(trace.result)}`;
+  item.appendChild(route);
+
+  const target = document.createElement("p");
+  target.textContent = `Target: tab ${trace.targetTabId ?? "n/a"} / frame ${trace.targetFrameId ?? "n/a"} • ${trace.latencyMs} ms`;
+  item.appendChild(target);
+
+  if (trace.error) {
+    const error = document.createElement("p");
+    error.textContent = `Error: ${trace.error}`;
+    item.appendChild(error);
+  }
+
+  const when = document.createElement("p");
+  when.textContent = `When: ${relativeTime(trace.timestamp)}`;
+  item.appendChild(when);
+
+  return item;
+}
+
+function renderHistory(snapshot: OperatorSnapshot) {
+  historyList.innerHTML = "";
+  if (snapshot.history.length == 0) {
+    const empty = document.createElement("p");
+    empty.className = "history-empty";
+    empty.textContent = "No command trace recorded yet.";
+    historyList.appendChild(empty);
+    return;
+  }
+
+  snapshot.history.slice(0, 12).forEach((trace) => {
+    historyList.appendChild(renderHistoryItem(trace));
+  });
+}
+
+function diagnosticItem(titleText: string, bodyText: string) {
+  const item = document.createElement("article");
+  item.className = "diagnostic-item";
+  const title = document.createElement("h3");
+  title.textContent = titleText;
+  item.appendChild(title);
+  const body = document.createElement("p");
+  body.textContent = bodyText;
+  item.appendChild(body);
+  return item;
+}
+
+function renderDiagnostics(snapshot: OperatorSnapshot) {
+  diagnosticsList.innerHTML = "";
+  diagnosticsList.appendChild(
+    diagnosticItem(
+      "Connection",
+      `Bus ${snapshot.connection.busConnected ? "connected" : "disconnected"} • ${titleCase(
+        snapshot.connection.reconnectState
+      )} • last heartbeat ${relativeTime(snapshot.connection.lastHeartbeatAt)}`
+    )
+  );
+  diagnosticsList.appendChild(
+    diagnosticItem(
+      "Targeting",
+      `Preferred tab ${snapshot.targeting.preferredTabId ?? "n/a"} • resolved ${
+        snapshot.targeting.lastResolvedTabId ?? "n/a"
+      } / frame ${snapshot.targeting.lastResolvedFrameId ?? "n/a"} • ${titleCase(
+        snapshot.targeting.targetResolutionState
+      )}`
+    )
+  );
+  diagnosticsList.appendChild(
+    diagnosticItem(
+      "Content reachability",
+      `Content script ${
+        snapshot.diagnostics.contentScriptReachable === null
+          ? "unknown"
+          : snapshot.diagnostics.contentScriptReachable
+          ? "reachable"
+          : "missing"
+      } • analyze-page ${
+        snapshot.diagnostics.analyzePageReachable === null
+          ? "unknown"
+          : snapshot.diagnostics.analyzePageReachable
+          ? "reachable"
+          : "missing"
+      }`
+    )
+  );
+  diagnosticsList.appendChild(
+    diagnosticItem(
+      "Last page context",
+      `Updated ${relativeTime(snapshot.diagnostics.lastPageContextAt)} • compatibility path ${
+        snapshot.diagnostics.compatibilityPathUsed ? "used" : "not used"
+      }`
+    )
+  );
+  if (snapshot.diagnostics.lastError) {
+    diagnosticsList.appendChild(diagnosticItem("Last error", snapshot.diagnostics.lastError));
+  }
+}
+
+function renderSnapshot(snapshot: OperatorSnapshot) {
+  renderActivePage(snapshot);
+  renderHistory(snapshot);
+  renderDiagnostics(snapshot);
+}
+
+function fetchSnapshot() {
+  chrome.runtime.sendMessage({ type: "get-operator-snapshot" }, (response) => {
+    if (chrome.runtime.lastError || !response || response.ok === false) {
+      diagnosticsList.innerHTML = "";
+      diagnosticsList.appendChild(
+        diagnosticItem(
+          "Snapshot unavailable",
+          chrome.runtime.lastError?.message || response?.error || "Worker did not return a snapshot."
+        )
+      );
+      return;
+    }
+
+    renderSnapshot(response as OperatorSnapshot);
+  });
+}
+
+function scheduleRefresh() {
+  if (refreshTimer !== undefined) {
+    window.clearInterval(refreshTimer);
+  }
+  refreshTimer = window.setInterval(() => {
+    fetchSnapshot();
+  }, 1000);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  fetchSnapshot();
+  scheduleRefresh();
+});
+
+window.addEventListener("unload", () => {
+  if (refreshTimer !== undefined) {
+    window.clearInterval(refreshTimer);
+  }
+});
+
+refreshButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  fetchSnapshot();
+});

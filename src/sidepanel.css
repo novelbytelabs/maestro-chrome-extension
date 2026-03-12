@@ -1,0 +1,203 @@
+:root {
+  color-scheme: dark light;
+  --bg: radial-gradient(circle at top, rgba(0, 172, 193, 0.14), transparent 25%),
+    linear-gradient(180deg, #06111b 0%, #030812 46%, #01050b 100%);
+  --panel: linear-gradient(180deg, rgba(6, 17, 27, 0.96) 0%, rgba(3, 10, 18, 0.98) 100%);
+  --panel-soft: linear-gradient(90deg, rgba(0, 171, 205, 0.08), rgba(22, 26, 57, 0.4));
+  --text: #dbe7f5;
+  --muted: #6d829e;
+  --line: rgba(0, 222, 255, 0.22);
+  --accent: #00e5ff;
+  --accent-strong: #ffd400;
+  --danger: #ff7089;
+  --success: #00f0c8;
+  --shadow: 0 0 0 1px rgba(0, 222, 255, 0.1), 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: linear-gradient(180deg, #eef7fb 0%, #dcebf2 100%);
+    --panel: linear-gradient(180deg, rgba(248, 252, 255, 0.98) 0%, rgba(237, 246, 250, 0.98) 100%);
+    --panel-soft: linear-gradient(90deg, rgba(0, 171, 205, 0.08), rgba(210, 228, 236, 0.65));
+    --text: #102033;
+    --muted: #5a6f86;
+    --line: rgba(0, 119, 153, 0.18);
+    --accent: #007d91;
+    --accent-strong: #b88700;
+    --danger: #c2415a;
+    --success: #007f67;
+    --shadow: 0 0 0 1px rgba(0, 119, 153, 0.08), 0 18px 40px rgba(15, 23, 42, 0.12);
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.shell {
+  padding: 16px;
+}
+
+.hero,
+.panel-card {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 14px;
+  padding: 16px;
+}
+
+.hero::before,
+.panel-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--panel-soft);
+  pointer-events: none;
+}
+
+.hero-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.eyebrow,
+.section-label,
+.metric-label {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 10px;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 28px;
+  line-height: 0.95;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lede {
+  position: relative;
+  z-index: 1;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.lede.small {
+  font-size: 12px;
+}
+
+.inline-action {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(0, 13, 20, 0.82);
+  color: var(--accent);
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.metric-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.metric-grid.compact {
+  margin-top: 12px;
+}
+
+.metric {
+  border: 1px solid rgba(0, 222, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(1, 10, 18, 0.42);
+  padding: 10px 12px;
+}
+
+.metric-wide {
+  grid-column: 1 / -1;
+}
+
+.metric-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+
+.metric-value {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.history-list,
+.diagnostics-list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+}
+
+.history-item,
+.diagnostic-item {
+  border: 1px solid rgba(0, 222, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(1, 10, 18, 0.42);
+  padding: 10px 12px;
+}
+
+.history-item h3,
+.diagnostic-item h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+}
+
+.history-item p,
+.diagnostic-item p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.history-item p:last-child,
+.diagnostic-item p:last-child {
+  margin-bottom: 0;
+}
+
+.history-empty {
+  color: var(--muted);
+  font-size: 12px;
+}

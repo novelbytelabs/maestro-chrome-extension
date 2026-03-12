@@ -11,7 +11,7 @@
       <section class="hero">
         <p class="eyebrow">Arqon Maestro // Chrome</p>
         <h1>Operator Deck</h1>
-        <p class="lede">Bus-native browser control, overlay routing, and worker diagnostics.</p>
+        <p class="lede">Wave 2 popup backed by the Wave 1 operator snapshot and runtime diagnostics.</p>
       </section>
 
       <section class="status-card">
@@ -21,23 +21,87 @@
           <p id="connectionStatus">Connection checking...</p>
         </div>
         <p id="connectionHint" class="status-hint">Waiting for the extension worker to report status.</p>
+        <p id="reconnectMeta" class="meta-line">State: Unknown</p>
       </section>
 
-      <section class="action-grid">
+      <section class="action-grid top-actions">
         <button id="docs" class="action action-primary" type="button">Open Docs</button>
         <button id="reconnect" class="action action-secondary" type="button">Reconnect</button>
+        <button id="sidepanel" class="action action-tertiary" type="button">Open Panel</button>
       </section>
 
-      <section class="settings-card">
+      <section class="settings-card top-settings">
         <div>
           <p class="section-label">Overlay policy</p>
-          <p class="settings-title">Always show overlays</p>
-          <p class="settings-copy">Disabled intentionally to avoid overlay spam across tabs and frames.</p>
+          <p class="settings-title">Always show overlays on this tab</p>
+          <p id="overlayPolicyCopy" class="settings-copy">Selective policy for the current active tab only.</p>
         </div>
-        <label class="switch" for="showClickables" aria-label="Always show overlays is disabled">
+        <label class="switch" for="showClickables" aria-label="Always show overlays on this tab">
           <input id="showClickables" type="checkbox" />
           <span class="slider round"></span>
         </label>
+      </section>
+
+      <section class="intel-card">
+        <div class="card-header">
+          <p class="section-label">Active page</p>
+          <button id="refresh" class="inline-action" type="button">Refresh</button>
+        </div>
+        <div class="metric-grid">
+          <div class="metric metric-wide">
+            <span class="metric-label">Site</span>
+            <span id="pageSite" class="metric-value">n/a</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Page type</span>
+            <span id="pageType" class="metric-value">Unknown</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Focused target</span>
+            <span id="pageFocus" class="metric-value">Unknown</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Actionables</span>
+            <span id="pageActionables" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Frames</span>
+            <span id="pageFrames" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Shadow DOM</span>
+            <span id="pageShadow" class="metric-value">No</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Injection health</span>
+            <span id="pageInjection" class="metric-value">Unknown</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="intel-card">
+        <p class="section-label">Last action</p>
+        <p id="lastActionCommand" class="action-command">No live command recorded yet</p>
+        <div class="metric-grid compact">
+          <div class="metric">
+            <span class="metric-label">Route</span>
+            <span id="lastActionRoute" class="metric-value">n/a</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Result</span>
+            <span id="lastActionResult" class="metric-value">n/a</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Latency</span>
+            <span id="lastActionLatency" class="metric-value">n/a</span>
+          </div>
+        </div>
+        <p id="lastActionError" class="status-hint">No error recorded.</p>
+      </section>
+
+      <section class="intel-card">
+        <p class="section-label">Diagnostics</p>
+        <div id="diagnosticsContent" class="diagnostics-content"></div>
       </section>
     </main>
     <script src="popup.js"></script>

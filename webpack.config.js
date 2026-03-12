@@ -10,6 +10,7 @@ module.exports = [
       "content-script": "./src/content-script.ts",
       injected: "./src/injected.ts",
       popup: "./src/popup.ts",
+      sidepanel: "./src/sidepanel.ts",
     },
     output: {
       path: path.resolve(__dirname, "build"),
@@ -35,6 +36,8 @@ module.exports = [
           { from: "src/injected.css", to: "injected.css" },
           { from: "src/popup.html", to: "popup.html" },
           { from: "src/popup.css", to: "popup.css" },
+          { from: "src/sidepanel.html", to: "sidepanel.html" },
+          { from: "src/sidepanel.css", to: "sidepanel.css" },
         ],
       }),
     ],

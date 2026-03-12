@@ -10,6 +10,35 @@ const ipc = new IPC(
     : "chrome",
   extensionCommandHandler
 );
+const overlayPolicyStorageKey = "overlayPolicyTabIds";
+const overlayPolicyTabIds = new Set<number>();
+let overlayPolicyLoaded = false;
+const overlayCooldownMs = 1500;
+const lastOverlayApplyAtByTabId: { [tabId: number]: number } = {};
+
+const ensureOverlayPolicyLoaded = async () => {
+  if (overlayPolicyLoaded) {
+    return;
+  }
+  overlayPolicyLoaded = true;
+  try {
+    const stored = await chrome.storage.local.get(overlayPolicyStorageKey);
+    const raw = stored[overlayPolicyStorageKey];
+    if (Array.isArray(raw)) {
+      raw.forEach((value) => {
+        if (typeof value == "number") {
+          overlayPolicyTabIds.add(value);
+        }
+      });
+    }
+  } catch (_error) {}
+};
+
+const persistOverlayPolicy = async () => {
+  await chrome.storage.local.set({
+    [overlayPolicyStorageKey]: Array.from(overlayPolicyTabIds.values()),
+  });
+};
 
 const ensureConnection = async (force: boolean = false) => {
   const connected = await ipc.ensureConnection(force);
@@ -148,6 +177,78 @@ const sendShowToBestFrame = async (tabId: number, message: any): Promise<any> =>
   return successful[0];
 };
 
+const sendCommandToAllFrames = async (tabId: number, message: any): Promise<any[]> => {
+  let frameIds = await frameIdsForTab(tabId);
+  let attempts = await Promise.all(frameIds.map((frameId) => sendToFrame(tabId, frameId, message)));
+
+  const missingReceiver = attempts.every(
+    (attempt) => !attempt.ok && attempt.error == "Could not establish connection. Receiving end does not exist."
+  );
+
+  if (missingReceiver) {
+    await ensureContentScriptAllFrames(tabId);
+    frameIds = await frameIdsForTab(tabId);
+    attempts = await Promise.all(frameIds.map((frameId) => sendToFrame(tabId, frameId, message)));
+  }
+
+  return attempts;
+};
+
+const clearOverlaysForTab = async (tabId: number) => {
+  try {
+    await sendCommandToAllFrames(tabId, {
+      type: "injected-script-command-request",
+      data: {
+        type: "COMMAND_TYPE_CANCEL",
+      },
+    });
+  } catch (_error) {}
+};
+
+const overlayPolicyEnabledForTab = async (tabId?: number) => {
+  await ensureOverlayPolicyLoaded();
+  return tabId !== undefined ? overlayPolicyTabIds.has(tabId) : false;
+};
+
+const setOverlayPolicyForTab = async (tabId: number, enabled: boolean) => {
+  await ensureOverlayPolicyLoaded();
+  if (enabled) {
+    overlayPolicyTabIds.add(tabId);
+  } else {
+    overlayPolicyTabIds.delete(tabId);
+  }
+  await persistOverlayPolicy();
+};
+
+const applyOverlayPolicyToTab = async (tabId: number, force: boolean = false) => {
+  await ensureOverlayPolicyLoaded();
+  if (!overlayPolicyTabIds.has(tabId)) {
+    return { ok: false, skipped: true };
+  }
+  const now = Date.now();
+  if (!force && lastOverlayApplyAtByTabId[tabId] && now - lastOverlayApplyAtByTabId[tabId] < overlayCooldownMs) {
+    return { ok: true, throttled: true };
+  }
+  lastOverlayApplyAtByTabId[tabId] = now;
+  return sendShowToBestFrame(tabId, {
+    type: "injected-script-command-request",
+    data: {
+      type: "COMMAND_TYPE_SHOW",
+      text: "all",
+    },
+  });
+};
+
+const refreshOverlayPolicyForActiveTab = async (force: boolean = false) => {
+  const tab = await activeNormalTab();
+  if (!tab?.id) {
+    return;
+  }
+  if (await overlayPolicyEnabledForTab(tab.id)) {
+    await applyOverlayPolicyToTab(tab.id, force);
+  }
+};
+
 const debugShowLinks = async () => {
   const tab = await activeNormalTab();
   if (!tab?.id) {
@@ -209,6 +310,30 @@ const debugPingContentScript = async () => {
   return result;
 };
 
+const openSidePanel = async () => {
+  const sidePanelApi = (chrome as any).sidePanel;
+  if (!sidePanelApi) {
+    return { ok: false, error: "sidePanel API unavailable" };
+  }
+
+  const tab = await activeNormalTab();
+  if (!tab?.id) {
+    return { ok: false, error: "No active http(s) browser tab found" };
+  }
+
+  try {
+    await sidePanelApi.setOptions({
+      tabId: tab.id,
+      path: "build/sidepanel.html",
+      enabled: true,
+    });
+    await sidePanelApi.open({ tabId: tab.id });
+    return { ok: true, tabId: tab.id };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+};
+
 (globalThis as any).__debugShowLinks = debugShowLinks;
 (globalThis as any).__debugPingContentScript = debugPingContentScript;
 (globalThis as any).__debugLastLiveShow = () => ipc.lastLiveShowDiagnostics();
@@ -216,8 +341,10 @@ const debugPingContentScript = async () => {
 (globalThis as any).__debugConnectionStatus = debugConnectionStatus;
 (globalThis as any).__debugReconnect = debugReconnect;
 (globalThis as any).__debugOperatorSnapshot = () => ipc.getOperatorSnapshot(true);
+(globalThis as any).__debugOpenSidePanel = openSidePanel;
 
 chrome.runtime.onStartup.addListener(async () => {
+  await ensureOverlayPolicyLoaded();
   await ensureConnection();
   await ipc.refreshActivePage(false);
 });
@@ -227,6 +354,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name == "keepAlive") {
     await ensureConnection();
     await ipc.refreshActivePage(false);
+    await refreshOverlayPolicyForActiveTab(false);
   }
 });
 
@@ -235,6 +363,9 @@ chrome.tabs.onActivated.addListener(async () => {
   await rememberPreferredTab(tabs[0]?.id);
   await ensureConnection();
   await ipc.refreshActivePage(false);
+  if (tabs[0]?.id) {
+    await refreshOverlayPolicyForActiveTab(true);
+  }
 });
 
 chrome.windows.onFocusChanged.addListener(async () => {
@@ -242,12 +373,16 @@ chrome.windows.onFocusChanged.addListener(async () => {
   await rememberPreferredTab(tabs[0]?.id);
   await ensureConnection();
   await ipc.refreshActivePage(false);
+  if (tabs[0]?.id) {
+    await refreshOverlayPolicyForActiveTab(true);
+  }
 });
 
 chrome.idle.onStateChanged.addListener(async (state) => {
   if (state == "active") {
     await ensureConnection();
     await ipc.refreshActivePage(false);
+    await refreshOverlayPolicyForActiveTab(false);
   }
 });
 
@@ -286,15 +421,70 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type == "open-side-panel") {
+    openSidePanel()
+      .then((result) => {
+        sendResponse(result);
+      })
+      .catch((error) => {
+        sendResponse({ ok: false, error: String(error) });
+      });
+    return true;
+  }
+
+  if (message.type == "get-overlay-policy") {
+    activeNormalTab()
+      .then(async (tab) => {
+        sendResponse({
+          ok: true,
+          tabId: tab?.id,
+          enabled: await overlayPolicyEnabledForTab(tab?.id),
+        });
+      })
+      .catch((error) => {
+        sendResponse({ ok: false, error: String(error) });
+      });
+    return true;
+  }
+
+  if (message.type == "set-overlay-policy") {
+    activeNormalTab()
+      .then(async (tab) => {
+        if (!tab?.id) {
+          sendResponse({ ok: false, error: "No active http(s) browser tab found" });
+          return;
+        }
+        const enabled = Boolean(message.enabled);
+        await setOverlayPolicyForTab(tab.id, enabled);
+        if (enabled) {
+          await applyOverlayPolicyToTab(tab.id, true);
+        } else {
+          await clearOverlaysForTab(tab.id);
+        }
+        sendResponse({ ok: true, tabId: tab.id, enabled });
+      })
+      .catch((error) => {
+        sendResponse({ ok: false, error: String(error) });
+      });
+    return true;
+  }
+
   if (message.type == "page-context") {
     const senderTabId = sender.tab?.id;
-    ipc.recordPageContext(message, senderTabId);
-    if (message.isTopFrame && senderTabId !== undefined) {
-      rememberPreferredTab(senderTabId);
-    }
-    ipc.refreshActivePage(false).catch(() => undefined);
-    sendResponse({ ok: true, preferredTabId: ipc.preferredTab() });
-    return false;
+    (async () => {
+      ipc.recordPageContext(message, senderTabId);
+      if (message.isTopFrame && senderTabId !== undefined) {
+        await rememberPreferredTab(senderTabId);
+        if (await overlayPolicyEnabledForTab(senderTabId)) {
+          await applyOverlayPolicyToTab(senderTabId, false);
+        }
+      }
+      await ipc.refreshActivePage(false).catch(() => undefined);
+      sendResponse({ ok: true, preferredTabId: ipc.preferredTab() });
+    })().catch((error) => {
+      sendResponse({ ok: false, error: String(error), preferredTabId: ipc.preferredTab() });
+    });
+    return true;
   }
 
   if (message.type == "debug-show-links") {

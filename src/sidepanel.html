@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Arqon Maestro Side Panel</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="hero-row">
+          <div>
+            <p class="eyebrow">Arqon Maestro // Chrome</p>
+            <h1>Operator Surface</h1>
+          </div>
+          <button id="refresh" class="inline-action" type="button">Refresh</button>
+        </div>
+        <p class="lede">Persistent page intelligence, execution history, and worker diagnostics.</p>
+      </section>
+
+      <section class="panel-card">
+        <p class="section-label">Active Page Intelligence</p>
+        <div class="metric-grid">
+          <div class="metric metric-wide">
+            <span class="metric-label">Site</span>
+            <span id="pageSite" class="metric-value">n/a</span>
+          </div>
+          <div class="metric metric-wide">
+            <span class="metric-label">Title</span>
+            <span id="pageTitle" class="metric-value">n/a</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Page type</span>
+            <span id="pageType" class="metric-value">Unknown</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Focused target</span>
+            <span id="pageFocus" class="metric-value">Unknown</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Links</span>
+            <span id="countLinks" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Buttons</span>
+            <span id="countButtons" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Inputs</span>
+            <span id="countInputs" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Code</span>
+            <span id="countCode" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Frames</span>
+            <span id="pageFrames" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Shadow DOM</span>
+            <span id="pageShadow" class="metric-value">No</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Injection health</span>
+            <span id="pageInjection" class="metric-value">Unknown</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Analyzed</span>
+            <span id="pageAnalyzed" class="metric-value">n/a</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-card">
+        <p class="section-label">Execution Ledger</p>
+        <div id="historyList" class="history-list"></div>
+      </section>
+
+      <section class="panel-card">
+        <p class="section-label">Diagnostics</p>
+        <div id="diagnosticsList" class="diagnostics-list"></div>
+      </section>
+
+      <section class="panel-card">
+        <p class="section-label">Policy Preview</p>
+        <div class="metric-grid compact">
+          <div class="metric">
+            <span class="metric-label">Current domain</span>
+            <span id="policyDomain" class="metric-value">n/a</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Overlay posture</span>
+            <span class="metric-value">Disabled</span>
+          </div>
+        </div>
+        <p class="lede small">Per-site policy editing is deferred. This panel is read-only in Wave 3.</p>
+      </section>
+    </main>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>
