@@ -1,17 +1,24 @@
 const showClickablesCheckbox = document.getElementById("showClickables") as HTMLInputElement;
-const docsButton = document.getElementById("docs") as HTMLAnchorElement;
-const reconnectButton = document.getElementById("reconnect") as HTMLAnchorElement;
+const docsButton = document.getElementById("docs") as HTMLButtonElement;
+const reconnectButton = document.getElementById("reconnect") as HTMLButtonElement;
 const connectionStatus = document.getElementById("connectionStatus") as HTMLParagraphElement;
+const connectionHint = document.getElementById("connectionHint") as HTMLParagraphElement;
 
 function setConnectionStatus(connected: boolean | undefined) {
   if (connected === undefined) {
-    connectionStatus.textContent = "Status: unknown";
+    connectionStatus.textContent = "Connection unknown";
+    connectionHint.textContent = "Worker unreachable or stale. Reload the extension if this persists.";
     connectionStatus.classList.remove("connected", "disconnected");
+    document.body.dataset.connectionState = "unknown";
     return;
   }
-  connectionStatus.textContent = connected ? "Status: connected" : "Status: disconnected";
+  connectionStatus.textContent = connected ? "Connected to Arqon Bus" : "Disconnected from Arqon Bus";
+  connectionHint.textContent = connected
+    ? "Live browser commands should route through the worker."
+    : "The extension worker is not currently connected to the local Bus.";
   connectionStatus.classList.toggle("connected", connected);
   connectionStatus.classList.toggle("disconnected", !connected);
+  document.body.dataset.connectionState = connected ? "connected" : "disconnected";
 }
 
 function refreshConnectionStatus() {

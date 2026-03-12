@@ -3,6 +3,8 @@ import * as editors from "./editors";
 export default class InjectedCommandHandler {
   private overlays: { node: Node; type: string }[] = [];
   private overlayClearTimeout?: number;
+  private backgroundResetTimeout?: number;
+  private copyOverlayTimeout?: number;
   private overlayLifecycleBound: boolean = false;
   private settings = {
     alwaysShowClickables: false,
@@ -30,10 +32,19 @@ export default class InjectedCommandHandler {
       window.clearTimeout(this.overlayClearTimeout);
       this.overlayClearTimeout = undefined;
     }
+    if (this.backgroundResetTimeout !== undefined) {
+      window.clearTimeout(this.backgroundResetTimeout);
+      this.backgroundResetTimeout = undefined;
+    }
+    if (this.copyOverlayTimeout !== undefined) {
+      window.clearTimeout(this.copyOverlayTimeout);
+      this.copyOverlayTimeout = undefined;
+    }
     let overlays = document.querySelectorAll("[id^=arqon-overlay]");
     overlays.forEach((overlay) => {
       overlay!.remove();
     });
+    document.getElementById("arqon-copy-overlay")?.remove();
 
     this.overlays = [];
   }
@@ -225,11 +236,7 @@ export default class InjectedCommandHandler {
       }
     }
 
-    await this.createAlarm('scroll-complete', 0.3);
-  }
-
-  private async createAlarm(name: string, delayInMinutes: number) {
-    await chrome.alarms.create(name, { delayInMinutes });
+    await new Promise((resolve) => window.setTimeout(resolve, 300));
   }
 
   private async findAndScroll(path: string) {
@@ -263,12 +270,13 @@ export default class InjectedCommandHandler {
       inline: "center",
       behavior: "smooth",
     });
-    await this.createAlarm('reset-background', 2);
-    chrome.alarms.onAlarm.addListener((alarm) => {
-      if (alarm.name === 'reset-background') {
-        (target as HTMLElement).style.backgroundColor = backgroundColor;
-      }
-    });
+    if (this.backgroundResetTimeout !== undefined) {
+      window.clearTimeout(this.backgroundResetTimeout);
+    }
+    this.backgroundResetTimeout = window.setTimeout(() => {
+      (target as HTMLElement).style.backgroundColor = backgroundColor;
+      this.backgroundResetTimeout = undefined;
+    }, 2000);
   }
 
   private showCopyOverlay(index: number) {
@@ -276,12 +284,13 @@ export default class InjectedCommandHandler {
     overlay.textContent = `Copied ${index}`;
     overlay.id = "arqon-copy-overlay";
     document.body.appendChild(overlay);
-    this.createAlarm('remove-overlay', 1);
-    chrome.alarms.onAlarm.addListener((alarm) => {
-      if (alarm.name === 'remove-overlay') {
-        document.body.removeChild(overlay);
-      }
-    });
+    if (this.copyOverlayTimeout !== undefined) {
+      window.clearTimeout(this.copyOverlayTimeout);
+    }
+    this.copyOverlayTimeout = window.setTimeout(() => {
+      overlay.remove();
+      this.copyOverlayTimeout = undefined;
+    }, 1000);
   }
 
   private showOverlays(nodes: Node[], overlayType: string) {

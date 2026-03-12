@@ -1,8 +1,26 @@
 import { v4 as uuidv4 } from "uuid";
 import ExtensionCommandHandler from "./extension-command-handler";
+import {
+  ActivePageSummary,
+  CommandResult,
+  CommandTrace,
+  ConnectionState,
+  createOperatorSnapshot,
+  DispatchRoute,
+  emptyActivePageSummary,
+  OperatorSnapshot,
+  PageAnalysisResult,
+  ResolvedTarget,
+  TargetResolutionState,
+} from "./operator-snapshot";
 
 export default class IPC {
   private static readonly preferredTabStorageKey = "preferredTabId";
+  private static readonly historyStorageKey = "operatorHistory";
+  private static readonly activePageStorageKey = "operatorActivePage";
+  private static readonly maxHistoryEntries = 20;
+  private static readonly analyzeThrottleMs = 1000;
+
   private app: string;
   private extensionCommandHandler: ExtensionCommandHandler;
   private connected: boolean = false;
@@ -19,11 +37,248 @@ export default class IPC {
   private retryDelayMs: number = 0;
   private preferredTabId?: number;
   private lastLiveShow?: any;
+  private lastLiveCommand?: any;
+  private persistedLoaded: boolean = false;
+  private snapshot: OperatorSnapshot = createOperatorSnapshot();
+  private lastAnalyzeAtByTabId: { [tabId: number]: number } = {};
 
   constructor(app: string, extensionCommandHandler: ExtensionCommandHandler) {
     this.app = app;
     this.extensionCommandHandler = extensionCommandHandler;
-    this.id = app; // Two instances of chrome share the same service worker.
+    this.id = app;
+  }
+
+  private async ensurePersistedStateLoaded(): Promise<void> {
+    if (this.persistedLoaded) {
+      return;
+    }
+
+    this.persistedLoaded = true;
+    try {
+      const stored = await chrome.storage.local.get([
+        IPC.preferredTabStorageKey,
+        IPC.historyStorageKey,
+        IPC.activePageStorageKey,
+      ]);
+      const storedTabId = stored[IPC.preferredTabStorageKey];
+      if (typeof storedTabId == "number") {
+        this.preferredTabId = storedTabId;
+        this.snapshot.targeting.preferredTabId = storedTabId;
+      }
+
+      if (Array.isArray(stored[IPC.historyStorageKey])) {
+        this.snapshot.history = stored[IPC.historyStorageKey].slice(0, IPC.maxHistoryEntries);
+        const latest = this.snapshot.history[0];
+        if (latest) {
+          this.syncLastActionFromTrace(latest);
+        }
+      }
+
+      const activePage = stored[IPC.activePageStorageKey];
+      if (activePage && typeof activePage == "object") {
+        this.snapshot.activePage = Object.assign(emptyActivePageSummary(), activePage);
+      }
+    } catch (error) {
+      this.setLastError(String(error));
+    }
+  }
+
+  private persistSnapshotFragments(): void {
+    const payload: { [key: string]: any } = {
+      [IPC.historyStorageKey]: this.snapshot.history,
+      [IPC.activePageStorageKey]: this.snapshot.activePage,
+    };
+
+    if (this.preferredTabId === undefined) {
+      payload[IPC.preferredTabStorageKey] = null;
+    } else {
+      payload[IPC.preferredTabStorageKey] = this.preferredTabId;
+    }
+
+    chrome.storage.local.set(payload, () => {
+      void chrome.runtime.lastError;
+    });
+  }
+
+  private cloneSnapshot(): OperatorSnapshot {
+    return JSON.parse(JSON.stringify(this.snapshot));
+  }
+
+  private syncLastActionFromTrace(trace: CommandTrace) {
+    this.snapshot.lastAction = {
+      commandType: trace.commandType,
+      label: trace.label,
+      route: trace.route,
+      result: trace.result,
+      latencyMs: trace.latencyMs,
+      error: trace.error,
+      timestamp: trace.timestamp,
+    };
+  }
+
+  private setLastError(error: string | null) {
+    this.snapshot.diagnostics.lastError = error;
+  }
+
+  private updateConnectionState(patch: Partial<ConnectionState>) {
+    this.snapshot.connection = Object.assign({}, this.snapshot.connection, patch, {
+      retryDelayMs: this.retryDelayMs,
+    });
+  }
+
+  private updateTargeting(patch: Partial<OperatorSnapshot["targeting"]>) {
+    this.snapshot.targeting = Object.assign({}, this.snapshot.targeting, patch);
+  }
+
+  private updateActivePage(patch: Partial<ActivePageSummary>) {
+    this.snapshot.activePage = Object.assign({}, this.snapshot.activePage, patch);
+  }
+
+  private updateResolvedTarget(target: ResolvedTarget) {
+    this.updateTargeting({
+      lastResolvedTabId: target.tabId,
+      lastResolvedFrameId: target.frameId,
+      targetResolutionState: target.state,
+    });
+  }
+
+  private deriveCommandLabel(command: any, fallbackText?: string): string {
+    const commandType = String(command?.type || "unknown");
+    const text = String(
+      command?.text ?? command?.path ?? command?.value ?? command?.target ?? fallbackText ?? ""
+    )
+      .trim()
+      .replace(/\s+/g, " ");
+
+    if (commandType == "COMPAT_OPEN_SITE") {
+      return `go to ${text}`.trim();
+    }
+    if (commandType == "COMPAT_OPEN_SITE_NEW_TAB") {
+      return `open new tab ${text}`.trim();
+    }
+    if (commandType == "COMMAND_TYPE_SHOW") {
+      return `show ${text}`.trim();
+    }
+    if (commandType == "COMMAND_TYPE_USE") {
+      return `use ${String(command?.index ?? text)}`.trim();
+    }
+    if (commandType == "COMMAND_TYPE_SWITCH_TAB") {
+      return `switch tab ${text}`.trim();
+    }
+    if (text) {
+      return `${commandType.replace(/^COMMAND_TYPE_/, "").toLowerCase().replace(/_/g, " ")} ${text}`.trim();
+    }
+    return commandType.replace(/^COMMAND_TYPE_/, "").toLowerCase().replace(/_/g, " ");
+  }
+
+  private normalizePayload(command: any, overrideText?: string): any {
+    const normalized: { [key: string]: any } = {
+      type: command?.type || "unknown",
+    };
+
+    ["text", "path", "value", "target", "index", "direction", "cursor", "cursorEnd", "source"].forEach(
+      (key) => {
+        if (command && command[key] !== undefined) {
+          if (key == "source" && typeof command[key] == "string") {
+            normalized[key] = `[source:${command[key].length}]`;
+          } else {
+            normalized[key] = command[key];
+          }
+        }
+      }
+    );
+
+    if (overrideText) {
+      normalized.text = overrideText;
+    }
+
+    if (Array.isArray(command?.modifiersList)) {
+      normalized.modifiersList = command.modifiersList;
+    }
+    if (Array.isArray(command?.modifiers)) {
+      normalized.modifiers = command.modifiers;
+    }
+
+    return normalized;
+  }
+
+  private classifyResult(response: any, route: DispatchRoute, compatibilityPathUsed: boolean): CommandResult {
+    const error =
+      (response && response.error) ||
+      (response && response.data && response.data.error) ||
+      (response && response.response && response.response.error);
+
+    if (error) {
+      return String(error).toLowerCase().includes("out of range") || String(error).toLowerCase().includes("requires")
+        ? "blocked"
+        : "failed";
+    }
+
+    if (response && response.ok === false) {
+      return "failed";
+    }
+
+    if (compatibilityPathUsed || route == "browser-nav-compat") {
+      return "fallback";
+    }
+
+    return "success";
+  }
+
+  private pushTrace(trace: CommandTrace) {
+    this.snapshot.history = [trace].concat(this.snapshot.history).slice(0, IPC.maxHistoryEntries);
+    this.syncLastActionFromTrace(trace);
+    this.snapshot.diagnostics.compatibilityPathUsed = trace.compatibilityPathUsed;
+    this.persistSnapshotFragments();
+  }
+
+  private isAddressBarFocusCommand(command: any): boolean {
+    const modifiers = Array.isArray(command?.modifiersList)
+      ? command.modifiersList
+      : Array.isArray(command?.modifiers)
+      ? command.modifiers
+      : [];
+    const key = String(command?.text || "").toLowerCase();
+    return (
+      command?.type == "COMMAND_TYPE_PRESS" &&
+      key == "l" &&
+      modifiers.some((modifier: string) => modifier == "command" || modifier == "control")
+    );
+  }
+
+  private isEnterPress(command: any): boolean {
+    return command?.type == "COMMAND_TYPE_PRESS" && String(command?.text || "").toLowerCase() == "enter";
+  }
+
+  private extractNavigationSequence(commands: any[], startIndex: number) {
+    let index = startIndex;
+    let createTab = false;
+
+    if (commands[index]?.type == "COMMAND_TYPE_CREATE_TAB") {
+      createTab = true;
+      index += 1;
+    }
+
+    if (!this.isAddressBarFocusCommand(commands[index])) {
+      return undefined;
+    }
+    const insertCommand = commands[index + 1];
+    const enterCommand = commands[index + 2];
+    if (insertCommand?.type != "COMMAND_TYPE_INSERT" || !this.isEnterPress(enterCommand)) {
+      return undefined;
+    }
+
+    const url = String(insertCommand?.text || "").trim();
+    if (!url) {
+      return undefined;
+    }
+
+    return {
+      createTab,
+      url,
+      consumedUntil: index + 2,
+      commands: commands.slice(startIndex, index + 3),
+    };
   }
 
   private nextMessageId(): string {
@@ -58,12 +313,10 @@ export default class IPC {
       return null;
     }
 
-    // Legacy plugin protocol message shape.
     if (typeof parsed.message == "string") {
       return parsed;
     }
 
-    // ArqonBus envelope carrying legacy payload in `payload`.
     if (parsed.payload && typeof parsed.payload.message == "string") {
       return {
         message: parsed.payload.message,
@@ -77,30 +330,36 @@ export default class IPC {
   private onClose() {
     this.connected = false;
     this.websocket = undefined;
+    this.updateConnectionState({
+      busConnected: false,
+      reconnectState: this.retryDelayMs > 0 ? "backoff" : "failed",
+    });
     this.setIcon();
   }
 
   private async onMessage(message: any) {
-    if (typeof message == "string") {
-      let request;
-      try {
-        request = this.extractLegacyRequest(JSON.parse(message));
-      } catch (e) {
-        return;
-      }
+    if (typeof message != "string") {
+      return;
+    }
 
-      if (!request) {
-        return;
-      }
+    let request;
+    try {
+      request = this.extractLegacyRequest(JSON.parse(message));
+    } catch (_error) {
+      return;
+    }
 
-      if (request.message == "response") {
-        const result = await this.handle(request.data.response);
-        if (result) {
-          this.send("callback", {
-            callback: request.data.callback,
-            data: result,
-          });
-        }
+    if (!request) {
+      return;
+    }
+
+    if (request.message == "response") {
+      const result = await this.handle(request.data.response);
+      if (result) {
+        this.send("callback", {
+          callback: request.data.callback,
+          data: result,
+        });
       }
     }
   }
@@ -109,6 +368,12 @@ export default class IPC {
     this.connected = true;
     this.retryDelayMs = 0;
     this.nextRetryAt = 0;
+    this.updateConnectionState({
+      busConnected: true,
+      lastConnectedAt: Date.now(),
+      reconnectState: "connected",
+      retryDelayMs: 0,
+    });
     this.sendActive();
     this.setIcon();
   }
@@ -116,6 +381,11 @@ export default class IPC {
   private scheduleRetry() {
     this.retryDelayMs = this.retryDelayMs === 0 ? 5000 : Math.min(this.retryDelayMs * 2, 60000);
     this.nextRetryAt = Date.now() + this.retryDelayMs;
+    this.updateConnectionState({
+      busConnected: false,
+      reconnectState: "backoff",
+      retryDelayMs: this.retryDelayMs,
+    });
   }
 
   private async probeAvailability(): Promise<boolean> {
@@ -189,7 +459,13 @@ export default class IPC {
   }
 
   async ensureConnection(force: boolean = false): Promise<boolean> {
+    await this.ensurePersistedStateLoaded();
+
     if (this.connected) {
+      this.updateConnectionState({
+        busConnected: true,
+        reconnectState: "connected",
+      });
       return true;
     }
 
@@ -198,9 +474,18 @@ export default class IPC {
     }
 
     if (!force && Date.now() < this.nextRetryAt) {
+      this.updateConnectionState({
+        busConnected: false,
+        reconnectState: "backoff",
+      });
       this.setIcon();
       return false;
     }
+
+    this.updateConnectionState({
+      busConnected: false,
+      reconnectState: "connecting",
+    });
 
     this.connectingPromise = (async () => {
       const available = await this.probeAvailability();
@@ -218,11 +503,12 @@ export default class IPC {
           this.scheduleRetry();
         }
         return connected;
-      } catch (_error) {
+      } catch (error) {
         this.connected = false;
         this.websocket = undefined;
         this.scheduleRetry();
         this.setIcon();
+        this.setLastError(String(error));
         return false;
       } finally {
         this.connectingPromise = undefined;
@@ -233,20 +519,17 @@ export default class IPC {
   }
 
   private async tab(): Promise<chrome.tabs.Tab | undefined> {
-    if (this.preferredTabId === undefined) {
-      try {
-        const stored = await chrome.storage.local.get(IPC.preferredTabStorageKey);
-        const storedTabId = stored[IPC.preferredTabStorageKey];
-        if (typeof storedTabId == "number") {
-          this.preferredTabId = storedTabId;
-        }
-      } catch (_error) {}
-    }
+    await this.ensurePersistedStateLoaded();
 
     if (this.preferredTabId !== undefined) {
       try {
         const preferred = await chrome.tabs.get(this.preferredTabId);
         if (preferred?.id && /^https?:\/\//.test(preferred.url || "")) {
+          this.updateResolvedTarget({
+            tabId: preferred.id,
+            frameId: this.snapshot.targeting.lastResolvedFrameId,
+            state: "resolved",
+          });
           return preferred;
         }
       } catch (_error) {
@@ -257,6 +540,11 @@ export default class IPC {
     const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     const tab = tabs.find((candidate) => /^https?:\/\//.test(candidate.url || ""));
     if (tab?.id) {
+      this.updateResolvedTarget({
+        tabId: tab.id,
+        frameId: this.snapshot.targeting.lastResolvedFrameId,
+        state: "fallback",
+      });
       this.preferredTabId = tab.id;
       return tab;
     }
@@ -270,15 +558,29 @@ export default class IPC {
       const url = active?.url || "";
       if (active?.id && /^https?:\/\//.test(url)) {
         this.preferredTabId = active.id;
+        this.updateResolvedTarget({
+          tabId: active.id,
+          frameId: this.snapshot.targeting.lastResolvedFrameId,
+          state: "fallback",
+        });
         return active;
       }
     }
 
+    this.updateResolvedTarget({
+      tabId: null,
+      frameId: null,
+      state: "missing",
+    });
     return undefined;
   }
 
   rememberPreferredTab(tabId?: number) {
     this.preferredTabId = tabId;
+    this.updateTargeting({
+      preferredTabId: tabId === undefined ? null : tabId,
+    });
+    this.persistSnapshotFragments();
     if (tabId === undefined) {
       return chrome.storage.local.remove(IPC.preferredTabStorageKey);
     }
@@ -293,6 +595,45 @@ export default class IPC {
 
   lastLiveShowDiagnostics() {
     return this.lastLiveShow;
+  }
+
+  lastLiveCommandDiagnostics() {
+    return this.lastLiveCommand;
+  }
+
+  async getOperatorSnapshot(forceAnalysis: boolean = false): Promise<OperatorSnapshot> {
+    await this.ensurePersistedStateLoaded();
+    if (forceAnalysis) {
+      await this.refreshActivePage(true);
+    }
+    return this.cloneSnapshot();
+  }
+
+  async refreshActivePage(force: boolean = false): Promise<ActivePageSummary> {
+    await this.ensurePersistedStateLoaded();
+    const tab = await this.tab();
+    if (!tab?.id) {
+      this.snapshot.activePage = emptyActivePageSummary();
+      this.snapshot.activePage.tabId = null;
+      this.snapshot.activePage.injectionHealth = "missing";
+      this.snapshot.activePage.analyzedAt = Date.now();
+      this.snapshot.diagnostics.analyzePageReachable = false;
+      this.persistSnapshotFragments();
+      return this.snapshot.activePage;
+    }
+
+    return this.analyzePageForTab(tab.id, force);
+  }
+
+  recordPageContext(message: any, senderTabId?: number) {
+    this.snapshot.diagnostics.lastPageContextAt = Date.now();
+    if (senderTabId !== undefined && message?.isTopFrame) {
+      this.preferredTabId = senderTabId;
+      this.updateTargeting({
+        preferredTabId: senderTabId,
+      });
+      this.persistSnapshotFragments();
+    }
   }
 
   private async sendToTab(tabId: number, message: any): Promise<any> {
@@ -366,8 +707,16 @@ export default class IPC {
     }
 
     const successful = attempts.filter((attempt) => attempt.ok);
+    this.snapshot.diagnostics.contentScriptReachable = successful.length > 0;
+
     if (successful.length == 0) {
-      return attempts[0];
+      return {
+        ok: false,
+        error: (attempts[0] && attempts[0].error) || "No frame responded",
+        targetTabId: tabId,
+        targetFrameId: null,
+        route: "content-script-direct" as DispatchRoute,
+      };
     }
 
     successful.sort((left, right) => {
@@ -376,74 +725,313 @@ export default class IPC {
       return rightCount - leftCount;
     });
 
+    this.updateResolvedTarget({
+      tabId,
+      frameId: successful[0].frameId,
+      state: this.snapshot.targeting.targetResolutionState == "missing" ? "fallback" : "resolved",
+    });
+
     return {
-      ...successful[0],
+      ok: true,
+      response: successful[0].response,
+      targetTabId: tabId,
+      targetFrameId: successful[0].frameId,
+      route: "content-script-direct" as DispatchRoute,
       frameIdsTried: frameIds,
       attempts,
     };
   }
 
-  private async sendMessageToContentScript(message: any): Promise<void> {
+  private inferRouteFromContentResponse(command: any, response: any): DispatchRoute {
+    if (response?.path == "content-script-direct") {
+      return "content-script-direct";
+    }
+    if (response && typeof response == "object" && response.id !== undefined && response.data !== undefined) {
+      return "injected";
+    }
+    if (command?.type == "COMMAND_TYPE_SHOW" || command?.type == "COMMAND_TYPE_USE" || command?.type == "COMMAND_TYPE_CANCEL") {
+      return "content-script-direct";
+    }
+    return "unknown";
+  }
+
+  private async sendMessageToContentScript(command: any): Promise<any> {
     const tab = await this.tab();
     if (!tab?.id) {
-      return;
+      return {
+        ok: false,
+        error: "No active tab available",
+        route: "unknown" as DispatchRoute,
+        targetTabId: null,
+        targetFrameId: null,
+      };
     }
 
-    if (message?.type == "injected-script-command-request" && message?.data?.type == "COMMAND_TYPE_SHOW") {
-      const attempt = await this.sendShowToBestFrame(tab.id, message);
-      if (!attempt?.ok) {
-        return;
-      }
-      return attempt.response;
+    const message = {
+      type: "injected-script-command-request",
+      data: command,
+    };
+
+    if (command?.type == "COMMAND_TYPE_SHOW") {
+      return this.sendShowToBestFrame(tab.id, message);
     }
 
     let attempt = await this.sendToTab(tab.id, message);
-    if (
-      !attempt.ok &&
-      attempt.error == "Could not establish connection. Receiving end does not exist."
-    ) {
+    if (!attempt.ok && attempt.error == "Could not establish connection. Receiving end does not exist.") {
       try {
         await this.ensureContentScript(tab.id);
       } catch (_error) {}
       attempt = await this.sendToTab(tab.id, message);
     }
 
+    this.snapshot.diagnostics.contentScriptReachable = attempt.ok;
+    this.updateResolvedTarget({
+      tabId: tab.id,
+      frameId: this.snapshot.targeting.lastResolvedFrameId,
+      state: attempt.ok ? this.snapshot.targeting.targetResolutionState : "missing",
+    });
+
     if (!attempt.ok) {
-      return;
+      return {
+        ok: false,
+        error: attempt.error,
+        route: "unknown" as DispatchRoute,
+        targetTabId: tab.id,
+        targetFrameId: this.snapshot.targeting.lastResolvedFrameId,
+      };
     }
 
-    return attempt.response;
+    return {
+      ok: true,
+      response: attempt.response,
+      route: this.inferRouteFromContentResponse(command, attempt.response),
+      targetTabId: tab.id,
+      targetFrameId: this.snapshot.targeting.lastResolvedFrameId,
+    };
+  }
+
+  private choosePrimaryFrame(frames: Array<PageAnalysisResult & { frameId: number }>) {
+    const focused = frames.find((frame) => frame.hasFocus);
+    if (focused) {
+      return focused;
+    }
+
+    const topFrame = frames.find((frame) => frame.isTopFrame);
+    if (topFrame) {
+      return topFrame;
+    }
+
+    return frames.sort((left, right) => right.actionableCounts.all - left.actionableCounts.all)[0];
+  }
+
+  private async analyzePageForTab(tabId: number, force: boolean = false): Promise<ActivePageSummary> {
+    const now = Date.now();
+    if (
+      !force &&
+      this.snapshot.activePage.tabId == tabId &&
+      this.lastAnalyzeAtByTabId[tabId] !== undefined &&
+      now - this.lastAnalyzeAtByTabId[tabId] < IPC.analyzeThrottleMs
+    ) {
+      return this.snapshot.activePage;
+    }
+
+    const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+    let frameIds = await this.frameIdsForTab(tabId).catch(() => [0]);
+    let attempts = await Promise.all(
+      frameIds.map((frameId) => this.sendToFrame(tabId, frameId, { type: "analyze-page" }))
+    );
+
+    const missingReceiver = attempts.every(
+      (attempt) => !attempt.ok && attempt.error == "Could not establish connection. Receiving end does not exist."
+    );
+
+    if (missingReceiver) {
+      try {
+        await this.ensureContentScript(tabId);
+      } catch (_error) {}
+      frameIds = await this.frameIdsForTab(tabId).catch(() => [0]);
+      attempts = await Promise.all(
+        frameIds.map((frameId) => this.sendToFrame(tabId, frameId, { type: "analyze-page" }))
+      );
+    }
+
+    const successful = attempts
+      .filter((attempt) => attempt.ok && attempt.response)
+      .map((attempt) => Object.assign({}, attempt.response, { frameId: attempt.frameId })) as Array<
+      PageAnalysisResult & { frameId: number }
+    >;
+
+    this.snapshot.diagnostics.analyzePageReachable = successful.length > 0;
+    this.snapshot.diagnostics.contentScriptReachable = successful.length > 0;
+
+    if (successful.length == 0) {
+      this.snapshot.activePage = Object.assign(emptyActivePageSummary(), {
+        tabId,
+        title: (tab && tab.title) || "",
+        url: (tab && tab.url) || "",
+        hostname: (() => {
+          try {
+            return new URL((tab && tab.url) || "").hostname;
+          } catch (_error) {
+            return "";
+          }
+        })(),
+        frameCount: frameIds.length,
+        injectionHealth: "missing",
+        analyzedAt: now,
+      });
+      this.lastAnalyzeAtByTabId[tabId] = now;
+      this.persistSnapshotFragments();
+      return this.snapshot.activePage;
+    }
+
+    const primary = this.choosePrimaryFrame(successful);
+    const topFrameResponded = successful.some((frame) => frame.isTopFrame);
+    const shadowPresent = successful.some((frame) => frame.shadowDomPresent);
+    const injectionHealth = topFrameResponded && successful.length >= 1 ? "healthy" : "degraded";
+
+    this.snapshot.activePage = {
+      tabId,
+      title: primary.title || (tab && tab.title) || "",
+      url: primary.tabLocalUrl || (tab && tab.url) || "",
+      hostname: primary.hostname || "",
+      pageType: primary.pageType,
+      focusedTarget: primary.focusedTarget,
+      actionableCounts: primary.actionableCounts,
+      frameCount: frameIds.length,
+      shadowDomPresent: shadowPresent,
+      injectionHealth,
+      analyzedAt: now,
+    };
+    this.lastAnalyzeAtByTabId[tabId] = now;
+    this.updateResolvedTarget({
+      tabId,
+      frameId: primary.frameId,
+      state: this.snapshot.targeting.targetResolutionState == "missing" ? "fallback" : "resolved",
+    });
+    this.persistSnapshotFragments();
+    return this.snapshot.activePage;
   }
 
   async handle(response: any): Promise<any> {
     let handlerResponse = null;
     if (response.execute) {
-      for (const command of response.execute.commandsList) {
-        if (command.type in (this.extensionCommandHandler as any)) {
-          handlerResponse = await (this.extensionCommandHandler as any)[command.type](command);
-        } else {
-          const request = {
-            type: "injected-script-command-request",
-            data: command,
-          };
-          if (command.type == "COMMAND_TYPE_SHOW") {
-            const tab = await this.tab();
-            this.lastLiveShow = {
+      const commands = response.execute.commandsList || [];
+      for (let i = 0; i < commands.length; i++) {
+        const command = commands[i];
+        const startedAt = Date.now();
+        const navigationSequence = this.extractNavigationSequence(commands, i);
+        let route: DispatchRoute = "unknown";
+        let error: string | null = null;
+        let targetTabId: number | null = this.snapshot.targeting.lastResolvedTabId;
+        let targetFrameId: number | null = this.snapshot.targeting.lastResolvedFrameId;
+        let compatibilityPathUsed = false;
+        let label = this.deriveCommandLabel(command);
+        let normalizedPayload = this.normalizePayload(command);
+
+        try {
+          if (navigationSequence) {
+            route = "browser-nav-compat";
+            compatibilityPathUsed = true;
+            label = this.deriveCommandLabel(
+              { type: navigationSequence.createTab ? "COMPAT_OPEN_SITE_NEW_TAB" : "COMPAT_OPEN_SITE" },
+              navigationSequence.url
+            );
+            normalizedPayload = this.normalizePayload(
+              { type: navigationSequence.createTab ? "COMPAT_OPEN_SITE_NEW_TAB" : "COMPAT_OPEN_SITE" },
+              navigationSequence.url
+            );
+            this.lastLiveCommand = {
               at: new Date().toISOString(),
               preferredTabId: this.preferredTabId,
-              resolvedTabId: tab?.id,
-              command,
-              request,
+              command: {
+                type: navigationSequence.createTab ? "COMPAT_OPEN_SITE_NEW_TAB" : "COMPAT_OPEN_SITE",
+                text: navigationSequence.url,
+                commands: navigationSequence.commands,
+              },
             };
-          }
-          handlerResponse = await this.sendMessageToContentScript(request);
-          if (command.type == "COMMAND_TYPE_SHOW") {
-            this.lastLiveShow = {
-              ...(this.lastLiveShow || {}),
+            handlerResponse = await this.extensionCommandHandler.navigateToSite(
+              navigationSequence.url,
+              navigationSequence.createTab
+            );
+            targetTabId = handlerResponse?.tabId ?? targetTabId;
+            this.lastLiveCommand = Object.assign({}, this.lastLiveCommand || {}, {
               result: handlerResponse,
+            });
+            i = navigationSequence.consumedUntil;
+          } else if (command.type in (this.extensionCommandHandler as any)) {
+            route = "extension-worker";
+            this.lastLiveCommand = {
+              at: new Date().toISOString(),
+              preferredTabId: this.preferredTabId,
+              command,
             };
+            handlerResponse = await (this.extensionCommandHandler as any)[command.type](command);
+            this.lastLiveCommand = Object.assign({}, this.lastLiveCommand || {}, {
+              result: handlerResponse,
+            });
+          } else {
+            this.lastLiveCommand = {
+              at: new Date().toISOString(),
+              preferredTabId: this.preferredTabId,
+              command,
+            };
+            if (command.type == "COMMAND_TYPE_SHOW") {
+              const tab = await this.tab();
+              this.lastLiveShow = {
+                at: new Date().toISOString(),
+                preferredTabId: this.preferredTabId,
+                resolvedTabId: tab?.id,
+                command,
+              };
+            }
+            const delivery = await this.sendMessageToContentScript(command);
+            route = delivery.route;
+            targetTabId = delivery.targetTabId;
+            targetFrameId = delivery.targetFrameId;
+            handlerResponse = delivery.ok ? delivery.response : { ok: false, error: delivery.error };
+            this.lastLiveCommand = Object.assign({}, this.lastLiveCommand || {}, {
+              result: handlerResponse,
+              route,
+            });
+            if (command.type == "COMMAND_TYPE_SHOW") {
+              this.lastLiveShow = Object.assign({}, this.lastLiveShow || {}, {
+                result: handlerResponse,
+                route,
+                targetFrameId,
+              });
+            }
           }
+        } catch (caughtError) {
+          error = String(caughtError);
+          handlerResponse = { ok: false, error };
+          this.setLastError(error);
         }
+
+        error =
+          error ||
+          (handlerResponse && handlerResponse.error) ||
+          (handlerResponse && handlerResponse.data && handlerResponse.data.error) ||
+          null;
+
+        const trace: CommandTrace = {
+          timestamp: Date.now(),
+          commandType: navigationSequence
+            ? navigationSequence.createTab
+              ? "COMPAT_OPEN_SITE_NEW_TAB"
+              : "COMPAT_OPEN_SITE"
+            : String(command?.type || "unknown"),
+          label,
+          normalizedPayload,
+          targetTabId,
+          targetFrameId,
+          route,
+          result: this.classifyResult(handlerResponse, route, compatibilityPathUsed),
+          latencyMs: Date.now() - startedAt,
+          error,
+          compatibilityPathUsed,
+        };
+        this.pushTrace(trace);
       }
     }
 
@@ -453,7 +1041,7 @@ export default class IPC {
     };
 
     if (handlerResponse) {
-      result = { ...handlerResponse };
+      result = Object.assign({}, handlerResponse);
     }
 
     return result;
@@ -464,30 +1052,40 @@ export default class IPC {
   }
 
   sendActive() {
-    this.send("active", {
+    const sent = this.send("active", {
       app: this.app,
       id: this.id,
     });
+    if (sent) {
+      this.updateConnectionState({
+        lastHeartbeatAt: Date.now(),
+      });
+    }
     this.setIcon();
   }
 
   sendHeartbeat() {
-    this.send("heartbeat", {
+    const sent = this.send("heartbeat", {
       app: this.app,
       id: this.id,
     });
+    if (sent) {
+      this.updateConnectionState({
+        lastHeartbeatAt: Date.now(),
+      });
+    }
     this.setIcon();
   }
 
   send(message: string, data: any) {
-    if (!this.connected || !this.websocket || this.websocket!.readyState != 1) {
+    if (!this.connected || !this.websocket || this.websocket.readyState != 1) {
       return false;
     }
 
     try {
-      this.websocket!.send(JSON.stringify(this.toEnvelope(message, data)));
+      this.websocket.send(JSON.stringify(this.toEnvelope(message, data)));
       return true;
-    } catch (e) {
+    } catch (_error) {
       this.connected = false;
       return false;
     }

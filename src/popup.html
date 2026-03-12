@@ -1,21 +1,45 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="dark light" />
     <title>Arqon Maestro for Chrome</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <h1>Arqon Maestro for Chrome</h1>
-    <p id="connectionStatus">Status: checking...</p>
-    <a href="#" id="docs">Read the docs</a>
-    <br />
-    <a href="#" id="reconnect">Reconnect</a>
-    <br />
-    <label for="showClickables">Always show overlays (disabled)</label>
-    <label class="switch">
-      <input id="showClickables" type="checkbox" />
-      <span class="slider round"></span>
-    </label>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Arqon Maestro // Chrome</p>
+        <h1>Operator Deck</h1>
+        <p class="lede">Bus-native browser control, overlay routing, and worker diagnostics.</p>
+      </section>
+
+      <section class="status-card">
+        <p class="section-label">Connection ledger</p>
+        <div class="status-row">
+          <span class="status-dot" aria-hidden="true"></span>
+          <p id="connectionStatus">Connection checking...</p>
+        </div>
+        <p id="connectionHint" class="status-hint">Waiting for the extension worker to report status.</p>
+      </section>
+
+      <section class="action-grid">
+        <button id="docs" class="action action-primary" type="button">Open Docs</button>
+        <button id="reconnect" class="action action-secondary" type="button">Reconnect</button>
+      </section>
+
+      <section class="settings-card">
+        <div>
+          <p class="section-label">Overlay policy</p>
+          <p class="settings-title">Always show overlays</p>
+          <p class="settings-copy">Disabled intentionally to avoid overlay spam across tabs and frames.</p>
+        </div>
+        <label class="switch" for="showClickables" aria-label="Always show overlays is disabled">
+          <input id="showClickables" type="checkbox" />
+          <span class="slider round"></span>
+        </label>
+      </section>
+    </main>
+    <script src="popup.js"></script>
   </body>
-  <script src="popup.js"></script>
 </html>

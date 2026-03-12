@@ -1,6 +1,16 @@
 import ExtensionCommandHandler from "./extension-command-handler";
 import IPC from "./ipc";
 
+const extensionCommandHandler = new ExtensionCommandHandler();
+const ipc = new IPC(
+  navigator.userAgent.includes("Brave")
+    ? "brave"
+    : navigator.userAgent.includes("Edg")
+    ? "edge"
+    : "chrome",
+  extensionCommandHandler
+);
+
 const ensureConnection = async (force: boolean = false) => {
   const connected = await ipc.ensureConnection(force);
   if (connected) {
@@ -17,7 +27,7 @@ const rememberPreferredTab = async (tabId?: number) => {
   try {
     const tab = await chrome.tabs.get(tabId);
     if (tab?.id && /^https?:\/\//.test(tab.url || "")) {
-      ipc.rememberPreferredTab(tab.id);
+      await ipc.rememberPreferredTab(tab.id);
     }
   } catch (_error) {}
 };
@@ -31,7 +41,7 @@ const activeNormalTab = async () => {
         return preferred;
       }
     } catch (_error) {
-      ipc.rememberPreferredTab(undefined);
+      await ipc.rememberPreferredTab(undefined);
     }
   }
 
@@ -159,14 +169,19 @@ const debugShowLinks = async () => {
   }
 };
 
-const debugConnectionStatus = async () => ({
-  connected: ipc.isConnected(),
-  preferredTabId: ipc.preferredTab(),
-  lastLiveShow: ipc.lastLiveShowDiagnostics(),
-});
+const debugConnectionStatus = async () => {
+  const snapshot = await ipc.getOperatorSnapshot(false);
+  return {
+    connected: snapshot.connection.busConnected,
+    preferredTabId: snapshot.targeting.preferredTabId,
+    lastLiveShow: ipc.lastLiveShowDiagnostics(),
+    reconnectState: snapshot.connection.reconnectState,
+  };
+};
 
 const debugReconnect = async () => {
   await ensureConnection(true);
+  await ipc.refreshActivePage(true);
   return debugConnectionStatus();
 };
 
@@ -180,10 +195,7 @@ const debugPingContentScript = async () => {
     type: "debug-content-script-ping",
   });
 
-  if (
-    !result.ok &&
-    result.error == "Could not establish connection. Receiving end does not exist."
-  ) {
+  if (!result.ok && result.error == "Could not establish connection. Receiving end does not exist.") {
     try {
       await ensureContentScriptAllFrames(tab.id);
     } catch (error) {
@@ -197,31 +209,24 @@ const debugPingContentScript = async () => {
   return result;
 };
 
-// Expose a direct worker-console test hook.
 (globalThis as any).__debugShowLinks = debugShowLinks;
 (globalThis as any).__debugPingContentScript = debugPingContentScript;
 (globalThis as any).__debugLastLiveShow = () => ipc.lastLiveShowDiagnostics();
+(globalThis as any).__debugLastLiveCommand = () => ipc.lastLiveCommandDiagnostics();
 (globalThis as any).__debugConnectionStatus = debugConnectionStatus;
 (globalThis as any).__debugReconnect = debugReconnect;
-
-const extensionCommandHandler = new ExtensionCommandHandler();
-const ipc = new IPC(
-  navigator.userAgent.includes("Brave")
-    ? "brave"
-    : navigator.userAgent.includes("Edg")
-    ? "edge"
-    : "chrome",
-  extensionCommandHandler
-);
+(globalThis as any).__debugOperatorSnapshot = () => ipc.getOperatorSnapshot(true);
 
 chrome.runtime.onStartup.addListener(async () => {
   await ensureConnection();
+  await ipc.refreshActivePage(false);
 });
 
 chrome.alarms.create("keepAlive", { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name == "keepAlive") {
     await ensureConnection();
+    await ipc.refreshActivePage(false);
   }
 });
 
@@ -229,24 +234,28 @@ chrome.tabs.onActivated.addListener(async () => {
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   await rememberPreferredTab(tabs[0]?.id);
   await ensureConnection();
+  await ipc.refreshActivePage(false);
 });
 
 chrome.windows.onFocusChanged.addListener(async () => {
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   await rememberPreferredTab(tabs[0]?.id);
   await ensureConnection();
+  await ipc.refreshActivePage(false);
 });
 
 chrome.idle.onStateChanged.addListener(async (state) => {
   if (state == "active") {
     await ensureConnection();
+    await ipc.refreshActivePage(false);
   }
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type == "reconnect") {
     ensureConnection(true)
-      .then(() => {
+      .then(async () => {
+        await ipc.refreshActivePage(true);
         sendResponse({ connected: ipc.isConnected() });
       })
       .catch(() => {
@@ -256,15 +265,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type == "connection-status") {
-    sendResponse({ connected: ipc.isConnected() });
-    return false;
+    ipc.getOperatorSnapshot(false)
+      .then((snapshot) => {
+        sendResponse({ connected: snapshot.connection.busConnected });
+      })
+      .catch(() => {
+        sendResponse({ connected: ipc.isConnected() });
+      });
+    return true;
+  }
+
+  if (message.type == "get-operator-snapshot") {
+    ipc.getOperatorSnapshot(true)
+      .then((snapshot) => {
+        sendResponse(snapshot);
+      })
+      .catch((error) => {
+        sendResponse({ ok: false, error: String(error) });
+      });
+    return true;
   }
 
   if (message.type == "page-context") {
-    const senderTabId = _sender.tab?.id;
+    const senderTabId = sender.tab?.id;
+    ipc.recordPageContext(message, senderTabId);
     if (message.isTopFrame && senderTabId !== undefined) {
       rememberPreferredTab(senderTabId);
     }
+    ipc.refreshActivePage(false).catch(() => undefined);
     sendResponse({ ok: true, preferredTabId: ipc.preferredTab() });
     return false;
   }
@@ -294,13 +322,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-// The rest of this is adapted from the solution here:
-// https://stackoverflow.com/questions/66618136/persistent-service-worker-in-chrome-extension/66618269
 let lifeline: any = undefined;
 keepAlive();
 
-chrome.runtime.onConnect.addListener(port => {
-  if (port.name === 'keepAlive') {
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "keepAlive") {
     lifeline = port;
     createKeepAliveAlarm();
     port.onDisconnect.addListener(createKeepAliveAlarm);
@@ -308,11 +334,11 @@ chrome.runtime.onConnect.addListener(port => {
 });
 
 function createKeepAliveAlarm() {
-  chrome.alarms.create('keepAliveForced', { delayInMinutes: 4 });
+  chrome.alarms.create("keepAliveForced", { delayInMinutes: 4 });
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'keepAliveForced') {
+  if (alarm.name === "keepAliveForced") {
     lifeline?.disconnect();
     lifeline = null;
     keepAlive();
@@ -324,21 +350,21 @@ async function keepAlive() {
     return;
   }
   for (const tab of await chrome.tabs.query({
-    url: '*://*/*'
+    url: "*://*/*",
   })) {
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab!.id! },
-        func: () => chrome.runtime.connect({ name: 'keepAlive' }),
+        func: () => chrome.runtime.connect({ name: "keepAlive" }),
       });
       chrome.tabs.onUpdated.removeListener(retryOnTabUpdate);
       return;
-    } catch (e) {}
+    } catch (_e) {}
   }
   chrome.tabs.onUpdated.addListener(retryOnTabUpdate);
 }
 
-async function retryOnTabUpdate(tabId: any, info: any, tab: any) {
+async function retryOnTabUpdate(_tabId: any, info: any, _tab: any) {
   if (info.url && /^(file|https?):/.test(info.url)) {
     keepAlive();
   }
