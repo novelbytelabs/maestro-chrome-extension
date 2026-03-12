@@ -9,6 +9,7 @@ import {
   createOperatorSnapshot,
   DispatchRoute,
   emptyActivePageSummary,
+  LifecycleEvent,
   OperatorSnapshot,
   PageAnalysisResult,
   ResolvedTarget,
@@ -20,6 +21,7 @@ export default class IPC {
   private static readonly historyStorageKey = "operatorHistory";
   private static readonly activePageStorageKey = "operatorActivePage";
   private static readonly maxHistoryEntries = 20;
+  private static readonly maxLifecycleEntries = 25;
   private static readonly analyzeThrottleMs = 1000;
 
   private app: string;
@@ -36,6 +38,7 @@ export default class IPC {
   private connectingPromise?: Promise<boolean>;
   private nextRetryAt: number = 0;
   private retryDelayMs: number = 0;
+  private consecutiveFailures: number = 0;
   private preferredTabId?: number;
   private lastLiveShow?: any;
   private lastLiveCommand?: any;
@@ -54,6 +57,7 @@ export default class IPC {
     this.app = app;
     this.extensionCommandHandler = extensionCommandHandler;
     this.id = app;
+    this.recordLifecycle("worker-start", "Service worker runtime initialized.");
   }
 
   private async ensurePersistedStateLoaded(): Promise<void> {
@@ -124,6 +128,15 @@ export default class IPC {
     };
   }
 
+  private recordLifecycle(kind: LifecycleEvent["kind"], detail: string) {
+    const event: LifecycleEvent = {
+      timestamp: Date.now(),
+      kind,
+      detail,
+    };
+    this.snapshot.lifecycle = [event].concat(this.snapshot.lifecycle).slice(0, IPC.maxLifecycleEntries);
+  }
+
   private setLastError(error: string | null) {
     this.snapshot.diagnostics.lastError = error;
   }
@@ -131,6 +144,9 @@ export default class IPC {
   private updateConnectionState(patch: Partial<ConnectionState>) {
     this.snapshot.connection = Object.assign({}, this.snapshot.connection, patch, {
       retryDelayMs: this.retryDelayMs,
+      nextRetryAt: this.nextRetryAt || null,
+      consecutiveFailures: this.consecutiveFailures,
+      websocketReadyState: this.websocket ? this.websocket.readyState : null,
     });
   }
 
@@ -149,6 +165,24 @@ export default class IPC {
       lastResolvedFrameId: target.frameId,
       targetResolutionState: target.state,
     });
+  }
+
+  noteWorkerWake(reason: string) {
+    this.snapshot.diagnostics.lastWakeReason = reason;
+    this.snapshot.diagnostics.lastKeepAliveAt = Date.now();
+    this.recordLifecycle("worker-wake", reason);
+  }
+
+  noteKeepAlive(detail: string) {
+    this.snapshot.diagnostics.lastKeepAliveAt = Date.now();
+    this.recordLifecycle("keepalive", detail);
+  }
+
+  noteContentScriptReinjection(reason: string) {
+    this.snapshot.diagnostics.contentScriptReinjections += 1;
+    this.snapshot.diagnostics.lastContentScriptReinjectionAt = Date.now();
+    this.snapshot.diagnostics.lastContentScriptReinjectionReason = reason;
+    this.recordLifecycle("reinjection", reason);
   }
 
   private deriveCommandLabel(command: any, fallbackText?: string): string {
@@ -343,10 +377,12 @@ export default class IPC {
   private onClose() {
     this.connected = false;
     this.websocket = undefined;
+    this.consecutiveFailures += 1;
     this.updateConnectionState({
       busConnected: false,
       reconnectState: this.retryDelayMs > 0 ? "backoff" : "failed",
     });
+    this.recordLifecycle("worker-disconnect", "WebSocket connection closed.");
     this.setIcon();
   }
 
@@ -381,12 +417,14 @@ export default class IPC {
     this.connected = true;
     this.retryDelayMs = 0;
     this.nextRetryAt = 0;
+    this.consecutiveFailures = 0;
     this.updateConnectionState({
       busConnected: true,
       lastConnectedAt: Date.now(),
       reconnectState: "connected",
       retryDelayMs: 0,
     });
+    this.recordLifecycle("worker-connect", "WebSocket connection opened.");
     this.sendActive();
     this.setIcon();
   }
@@ -399,6 +437,7 @@ export default class IPC {
       reconnectState: "backoff",
       retryDelayMs: this.retryDelayMs,
     });
+    this.recordLifecycle("worker-backoff", `Retry scheduled in ${this.retryDelayMs}ms.`);
   }
 
   private async probeAvailability(): Promise<boolean> {
@@ -498,7 +537,9 @@ export default class IPC {
     this.updateConnectionState({
       busConnected: false,
       reconnectState: "connecting",
+      lastReconnectAttemptAt: Date.now(),
     });
+    this.recordLifecycle("worker-reconnect-attempt", force ? "Forced reconnect requested." : "Automatic reconnect attempt.");
 
     this.connectingPromise = (async () => {
       const available = await this.probeAvailability();
@@ -648,6 +689,7 @@ export default class IPC {
 
   recordPageContext(message: any, senderTabId?: number) {
     this.snapshot.diagnostics.lastPageContextAt = Date.now();
+    this.recordLifecycle("page-context", message?.href ? `Page context received for ${message.href}` : "Page context received.");
     if (senderTabId !== undefined && message?.isTopFrame) {
       this.preferredTabId = senderTabId;
       this.updateTargeting({
@@ -705,6 +747,7 @@ export default class IPC {
   }
 
   private async ensureContentScript(tabId: number): Promise<void> {
+    this.noteContentScriptReinjection(`Injected content script into tab ${tabId}.`);
     await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
       files: ["build/content-script.js"],

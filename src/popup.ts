@@ -28,6 +28,7 @@ const lastActionError = document.getElementById("lastActionError") as HTMLParagr
 const diagnosticsContent = document.getElementById("diagnosticsContent") as HTMLDivElement;
 
 let refreshTimer: number | undefined;
+let reconnectInFlight = false;
 
 function titleCase(value: string) {
   return value
@@ -108,6 +109,10 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
       snapshot.targeting.lastResolvedFrameId ?? "n/a"
     }`,
     `Target state: ${titleCase(snapshot.targeting.targetResolutionState)}`,
+    `Reconnect: ${titleCase(snapshot.connection.reconnectState)} • failures ${snapshot.connection.consecutiveFailures}`,
+    `Next retry: ${relativeTime(snapshot.connection.nextRetryAt)}`,
+    `Worker wake: ${snapshot.diagnostics.lastWakeReason || "n/a"}`,
+    `Keepalive: ${relativeTime(snapshot.diagnostics.lastKeepAliveAt)}`,
     `Page context: ${relativeTime(snapshot.diagnostics.lastPageContextAt)}`,
     `Content script: ${
       snapshot.diagnostics.contentScriptReachable === null
@@ -122,6 +127,9 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
         : snapshot.diagnostics.analyzePageReachable
         ? "reachable"
         : "missing"
+    }`,
+    `Reinjections: ${snapshot.diagnostics.contentScriptReinjections} • ${
+      snapshot.diagnostics.lastContentScriptReinjectionReason || "n/a"
     }`,
     `Compatibility path: ${snapshot.diagnostics.compatibilityPathUsed ? "used" : "not used"}`,
     `History depth: ${snapshot.history.length}`,
@@ -155,6 +163,12 @@ function fetchSnapshot() {
 
     renderSnapshot(response as OperatorSnapshot);
   });
+}
+
+function setReconnectBusyState(busy: boolean) {
+  reconnectInFlight = busy;
+  reconnectButton.disabled = busy;
+  reconnectButton.textContent = busy ? "Reconnecting..." : "Reconnect";
 }
 
 function refreshOverlayPolicy() {
@@ -228,8 +242,18 @@ refreshButton.addEventListener("click", (event) => {
 
 reconnectButton.addEventListener("click", (event) => {
   event.preventDefault();
-  chrome.runtime.sendMessage({ type: "reconnect" }, () => {
+  if (reconnectInFlight) {
+    return;
+  }
+  setReconnectBusyState(true);
+  chrome.runtime.sendMessage({ type: "reconnect" }, (response) => {
+    if (chrome.runtime.lastError || !response) {
+      document.body.dataset.connectionState = "unknown";
+      connectionHint.textContent = chrome.runtime.lastError?.message || "Reconnect request did not return a response.";
+    }
     fetchSnapshot();
+    refreshOverlayPolicy();
+    setReconnectBusyState(false);
   });
 });
 

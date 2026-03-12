@@ -19,6 +19,7 @@ const policyDomain = document.getElementById("policyDomain") as HTMLSpanElement;
 
 const historyList = document.getElementById("historyList") as HTMLDivElement;
 const diagnosticsList = document.getElementById("diagnosticsList") as HTMLDivElement;
+const lifecycleList = document.getElementById("lifecycleList") as HTMLDivElement;
 const capabilityList = document.getElementById("capabilityList") as HTMLDivElement;
 
 let refreshTimer: number | undefined;
@@ -139,7 +140,9 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
       "Connection",
       `Bus ${snapshot.connection.busConnected ? "connected" : "disconnected"} • ${titleCase(
         snapshot.connection.reconnectState
-      )} • last heartbeat ${relativeTime(snapshot.connection.lastHeartbeatAt)}`
+      )} • last heartbeat ${relativeTime(snapshot.connection.lastHeartbeatAt)} • readyState ${
+        snapshot.connection.websocketReadyState === null ? "n/a" : snapshot.connection.websocketReadyState
+      }`
     )
   );
   diagnosticsList.appendChild(
@@ -178,9 +181,43 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
       }`
     )
   );
+  diagnosticsList.appendChild(
+    diagnosticItem(
+      "Reinjection",
+      `${snapshot.diagnostics.contentScriptReinjections} attempts • last ${relativeTime(
+        snapshot.diagnostics.lastContentScriptReinjectionAt
+      )} • ${snapshot.diagnostics.lastContentScriptReinjectionReason || "n/a"}`
+    )
+  );
   if (snapshot.diagnostics.lastError) {
     diagnosticsList.appendChild(diagnosticItem("Last error", snapshot.diagnostics.lastError));
   }
+}
+
+function renderLifecycle(snapshot: OperatorSnapshot) {
+  lifecycleList.innerHTML = "";
+  lifecycleList.appendChild(
+    diagnosticItem(
+      "Reconnect State",
+      `${titleCase(snapshot.connection.reconnectState)} • failures ${snapshot.connection.consecutiveFailures} • next retry ${relativeTime(
+        snapshot.connection.nextRetryAt
+      )}`
+    )
+  );
+  lifecycleList.appendChild(
+    diagnosticItem(
+      "Worker Activity",
+      `Wake reason ${snapshot.diagnostics.lastWakeReason || "n/a"} • keepalive ${relativeTime(
+        snapshot.diagnostics.lastKeepAliveAt
+      )} • last connect ${relativeTime(snapshot.connection.lastConnectedAt)}`
+    )
+  );
+
+  snapshot.lifecycle.slice(0, 8).forEach((event) => {
+    lifecycleList.appendChild(
+      diagnosticItem(titleCase(event.kind), `${event.detail} • ${relativeTime(event.timestamp)}`)
+    );
+  });
 }
 
 function renderCapabilities() {
@@ -208,6 +245,7 @@ function renderSnapshot(snapshot: OperatorSnapshot) {
   renderActivePage(snapshot);
   renderHistory(snapshot);
   renderDiagnostics(snapshot);
+  renderLifecycle(snapshot);
 }
 
 function fetchSnapshot() {

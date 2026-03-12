@@ -73,6 +73,25 @@ export interface ConnectionState {
   lastHeartbeatAt: number | null;
   reconnectState: ReconnectState;
   retryDelayMs: number;
+  nextRetryAt: number | null;
+  lastReconnectAttemptAt: number | null;
+  consecutiveFailures: number;
+  websocketReadyState: number | null;
+}
+
+export interface LifecycleEvent {
+  timestamp: number;
+  kind:
+    | "worker-start"
+    | "worker-wake"
+    | "worker-connect"
+    | "worker-disconnect"
+    | "worker-backoff"
+    | "worker-reconnect-attempt"
+    | "keepalive"
+    | "page-context"
+    | "reinjection";
+  detail: string;
 }
 
 export interface PageAnalysisResult {
@@ -115,7 +134,13 @@ export interface OperatorSnapshot {
     analyzePageReachable: boolean | null;
     lastPageContextAt: number | null;
     compatibilityPathUsed: boolean;
+    lastKeepAliveAt: number | null;
+    lastWakeReason: string | null;
+    contentScriptReinjections: number;
+    lastContentScriptReinjectionAt: number | null;
+    lastContentScriptReinjectionReason: string | null;
   };
+  lifecycle: LifecycleEvent[];
 }
 
 export function emptyActionableCounts(): ActionableCounts {
@@ -153,6 +178,10 @@ export function createOperatorSnapshot(): OperatorSnapshot {
       lastHeartbeatAt: null,
       reconnectState: "idle",
       retryDelayMs: 0,
+      nextRetryAt: null,
+      lastReconnectAttemptAt: null,
+      consecutiveFailures: 0,
+      websocketReadyState: null,
     },
     targeting: {
       preferredTabId: null,
@@ -177,6 +206,12 @@ export function createOperatorSnapshot(): OperatorSnapshot {
       analyzePageReachable: null,
       lastPageContextAt: null,
       compatibilityPathUsed: false,
+      lastKeepAliveAt: null,
+      lastWakeReason: null,
+      contentScriptReinjections: 0,
+      lastContentScriptReinjectionAt: null,
+      lastContentScriptReinjectionReason: null,
     },
+    lifecycle: [],
   };
 }

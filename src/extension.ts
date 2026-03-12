@@ -10,6 +10,7 @@ const ipc = new IPC(
     : "chrome",
   extensionCommandHandler
 );
+ipc.noteWorkerWake("service-worker-evaluated");
 const overlayPolicyStorageKey = "overlayPolicyTabIds";
 const overlayPolicyTabIds = new Set<number>();
 let overlayPolicyLoaded = false;
@@ -344,6 +345,7 @@ const openSidePanel = async () => {
 (globalThis as any).__debugOpenSidePanel = openSidePanel;
 
 chrome.runtime.onStartup.addListener(async () => {
+  ipc.noteWorkerWake("chrome.runtime.onStartup");
   await ensureOverlayPolicyLoaded();
   await ensureConnection();
   await ipc.refreshActivePage(false);
@@ -352,6 +354,7 @@ chrome.runtime.onStartup.addListener(async () => {
 chrome.alarms.create("keepAlive", { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name == "keepAlive") {
+    ipc.noteKeepAlive("Periodic keepAlive alarm fired.");
     await ensureConnection();
     await ipc.refreshActivePage(false);
     await refreshOverlayPolicyForActiveTab(false);
@@ -359,6 +362,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 chrome.tabs.onActivated.addListener(async () => {
+  ipc.noteWorkerWake("chrome.tabs.onActivated");
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   await rememberPreferredTab(tabs[0]?.id);
   await ensureConnection();
@@ -369,6 +373,7 @@ chrome.tabs.onActivated.addListener(async () => {
 });
 
 chrome.windows.onFocusChanged.addListener(async () => {
+  ipc.noteWorkerWake("chrome.windows.onFocusChanged");
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   await rememberPreferredTab(tabs[0]?.id);
   await ensureConnection();
@@ -380,6 +385,7 @@ chrome.windows.onFocusChanged.addListener(async () => {
 
 chrome.idle.onStateChanged.addListener(async (state) => {
   if (state == "active") {
+    ipc.noteWorkerWake("chrome.idle.onStateChanged(active)");
     await ensureConnection();
     await ipc.refreshActivePage(false);
     await refreshOverlayPolicyForActiveTab(false);
@@ -524,11 +530,13 @@ chrome.runtime.onConnect.addListener((port) => {
 });
 
 function createKeepAliveAlarm() {
+  ipc.noteKeepAlive("Scheduled forced keepAlive alarm.");
   chrome.alarms.create("keepAliveForced", { delayInMinutes: 4 });
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "keepAliveForced") {
+    ipc.noteKeepAlive("Forced keepAlive alarm fired.");
     lifeline?.disconnect();
     lifeline = null;
     keepAlive();
@@ -539,6 +547,7 @@ async function keepAlive() {
   if (lifeline) {
     return;
   }
+  ipc.noteKeepAlive("Attempting to establish keepAlive lifeline.");
   for (const tab of await chrome.tabs.query({
     url: "*://*/*",
   })) {
