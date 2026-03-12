@@ -133,6 +133,14 @@ export interface FutureFeatureState {
   rememberedCommandsCount: number;
 }
 
+export interface ModePolicy {
+  commandExecution: "blocked" | "limited" | "full";
+  overlayCommandsAllowed: boolean;
+  navigationCommandsAllowed: boolean;
+  mutatingCommandsAllowed: boolean;
+  note: string;
+}
+
 export interface OperatorSnapshot {
   mode: OperatorMode;
   connection: ConnectionState;
@@ -168,6 +176,7 @@ export interface OperatorSnapshot {
   lifecycle: LifecycleEvent[];
   sitePolicy: SitePolicyPreview;
   future: FutureFeatureState;
+  modePolicy: ModePolicy;
 }
 
 export function emptyActionableCounts(): ActionableCounts {
@@ -257,6 +266,13 @@ export function createOperatorSnapshot(): OperatorSnapshot {
       semanticMemory: "foundation",
       semanticHandlesCount: 0,
       rememberedCommandsCount: 0,
+    },
+    modePolicy: {
+      commandExecution: "full",
+      overlayCommandsAllowed: true,
+      navigationCommandsAllowed: true,
+      mutatingCommandsAllowed: true,
+      note: "Pilot mode allows normal supported command execution.",
     },
   };
 }

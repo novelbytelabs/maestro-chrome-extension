@@ -6,7 +6,8 @@ const refreshButton = document.getElementById("refresh") as HTMLButtonElement;
 const sidePanelButton = document.getElementById("sidepanel") as HTMLButtonElement;
 const showClickablesCheckbox = document.getElementById("showClickables") as HTMLInputElement;
 const overlayPolicyCopy = document.getElementById("overlayPolicyCopy") as HTMLParagraphElement;
-const modeBadge = document.getElementById("modeBadge") as HTMLSpanElement;
+const modeSelect = document.getElementById("modeSelect") as HTMLSelectElement;
+const modePolicyNote = document.getElementById("modePolicyNote") as HTMLParagraphElement;
 
 const connectionStatus = document.getElementById("connectionStatus") as HTMLParagraphElement;
 const connectionHint = document.getElementById("connectionHint") as HTMLParagraphElement;
@@ -58,6 +59,7 @@ function normalizeSnapshot(snapshot: Partial<OperatorSnapshot> | undefined | nul
     diagnostics: { ...base.diagnostics, ...(snapshot.diagnostics || {}) },
     sitePolicy: { ...base.sitePolicy, ...(snapshot.sitePolicy || {}) },
     future: { ...base.future, ...(snapshot.future || {}) },
+    modePolicy: { ...base.modePolicy, ...(snapshot.modePolicy || {}) },
     history: Array.isArray(snapshot.history) ? snapshot.history : base.history,
     lifecycle: Array.isArray(snapshot.lifecycle) ? snapshot.lifecycle : base.lifecycle,
   };
@@ -107,7 +109,8 @@ function setConnectionStatus(snapshot: OperatorSnapshot) {
 }
 
 function renderMode(snapshot: OperatorSnapshot) {
-  modeBadge.textContent = titleCase(snapshot.mode);
+  modeSelect.value = snapshot.mode;
+  modePolicyNote.textContent = snapshot.modePolicy.note;
 }
 
 function renderActivePage(snapshot: OperatorSnapshot) {
@@ -213,7 +216,7 @@ function refreshOverlayPolicy() {
     if (chrome.runtime.lastError || !response?.ok) {
       showClickablesCheckbox.checked = false;
       showClickablesCheckbox.disabled = true;
-      overlayPolicyCopy.textContent = "Overlay policy unavailable for the current page.";
+      overlayPolicyCopy.textContent = "Link overlay policy unavailable for the current page.";
       return;
     }
 
@@ -222,8 +225,8 @@ function refreshOverlayPolicy() {
     overlayPolicyCopy.textContent = response.blockedByPolicy
       ? "Blocked by policy on sensitive domains. Use explicit overlay commands instead."
       : response.enabled
-      ? "Enabled only for the current tab. Overlays will follow focus on this tab."
-      : "Selective policy for the current active tab only.";
+      ? "Enabled only for the current tab. Link overlays will follow focus on this tab."
+      : "Auto-show link overlays only for the current active tab.";
   });
 }
 
@@ -331,8 +334,20 @@ showClickablesCheckbox.addEventListener("change", () => {
       overlayPolicyCopy.textContent = response.blockedByPolicy
         ? "Blocked by policy on sensitive domains. Use explicit overlay commands instead."
         : response.enabled
-        ? "Enabled only for the current tab. Overlays will follow focus on this tab."
-        : "Selective policy for the current active tab only.";
+        ? "Enabled only for the current tab. Link overlays will follow focus on this tab."
+        : "Auto-show link overlays only for the current active tab.";
     }
   );
+});
+
+modeSelect.addEventListener("change", () => {
+  chrome.runtime.sendMessage({ type: "set-mode", mode: modeSelect.value }, (response) => {
+    if (chrome.runtime.lastError || !response?.ok) {
+      connectionHint.textContent = chrome.runtime.lastError?.message || response?.error || "Failed to update operator mode.";
+      fetchSnapshot();
+      return;
+    }
+    renderSnapshot(normalizeSnapshot(response.snapshot as Partial<OperatorSnapshot>));
+    refreshOverlayPolicy();
+  });
 });

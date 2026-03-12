@@ -464,9 +464,6 @@ export default class InjectedCommandHandler {
         'input, textarea, [role="checkbox"], [role="radio"], label, [contenteditable="true"]';
     } else if (target == "code") {
       selector = "pre, code";
-    } else if (target == "all") {
-      selector =
-        'a, button, summary, [role="link"], [role="button"], input, textarea, [role="checkbox"], [role="radio"], label, [contenteditable="true"]';
     } else {
       return {
         ok: false,

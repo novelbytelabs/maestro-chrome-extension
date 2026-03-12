@@ -161,7 +161,7 @@ const URL = "ws://localhost:9100/";
 
 ### 5.1 How It Works
 
-When user says `show links`, `show inputs`, `show code`, or `show all`:
+When user says `show links`, `show inputs`, or `show code`:
 
 1. `COMMAND_TYPE_SHOW` is invoked
 2. Selector is built based on element type:

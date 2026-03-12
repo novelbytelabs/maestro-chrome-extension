@@ -77,6 +77,12 @@ body {
   gap: 10px;
 }
 
+.mode-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .eyebrow,
 .section-label,
 .metric-label {
@@ -129,7 +135,8 @@ h1 {
   cursor: pointer;
 }
 
-.panel-badge {
+.panel-select {
+  appearance: none;
   border: 1px solid rgba(255, 212, 0, 0.3);
   border-radius: 999px;
   padding: 6px 10px;
@@ -138,8 +145,31 @@ h1 {
   font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.panel-select option {
+  background: #08131e;
+  color: #dbe7f5;
+}
+
+.panel-select:focus,
+.panel-select:active {
+  background: #08131e;
+  color: #ffd400;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .metric-grid {

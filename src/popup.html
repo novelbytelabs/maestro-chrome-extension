@@ -11,7 +11,15 @@
       <section class="hero">
         <div class="hero-topline">
           <p class="eyebrow">Arqon Maestro // Chrome</p>
-          <span id="modeBadge" class="mode-badge">Pilot</span>
+          <div class="mode-control">
+            <label class="sr-only" for="modeSelect">Operator mode</label>
+            <select id="modeSelect" class="mode-select">
+              <option value="observe">Observe</option>
+              <option value="assist">Assist</option>
+              <option value="pilot" selected>Pilot</option>
+              <option value="locked">Locked</option>
+            </select>
+          </div>
         </div>
         <h1>Operator Deck</h1>
         <p class="lede">Browser control and diagnostics for the Arqon Maestro Chrome beta.</p>
@@ -25,6 +33,7 @@
         </div>
         <p id="connectionHint" class="status-hint">Waiting for the extension worker to report status.</p>
         <p id="reconnectMeta" class="meta-line">State: Unknown</p>
+        <p id="modePolicyNote" class="status-hint">Pilot mode allows normal supported command execution.</p>
       </section>
 
       <section class="action-grid top-actions">
@@ -36,10 +45,10 @@
       <section class="settings-card top-settings">
         <div>
           <p class="section-label">Overlay policy</p>
-          <p class="settings-title">Always show overlays on this tab</p>
-          <p id="overlayPolicyCopy" class="settings-copy">Selective policy for the current active tab only.</p>
+          <p class="settings-title">Always show link overlays on this tab</p>
+          <p id="overlayPolicyCopy" class="settings-copy">Auto-show link overlays only for the current active tab.</p>
         </div>
-        <label class="switch" for="showClickables" aria-label="Always show overlays on this tab">
+        <label class="switch" for="showClickables" aria-label="Always show link overlays on this tab">
           <input id="showClickables" type="checkbox" />
           <span class="slider round"></span>
         </label>
@@ -48,7 +57,7 @@
       <section class="intel-card">
         <div class="card-header">
           <p class="section-label">Active page</p>
-          <button id="refresh" class="inline-action" type="button">Refresh</button>
+          <button id="refresh" class="inline-action" type="button" aria-label="Refresh snapshot" title="Refresh snapshot">↻</button>
         </div>
         <div class="metric-grid">
           <div class="metric metric-wide">

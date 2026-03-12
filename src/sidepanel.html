@@ -15,11 +15,20 @@
             <h1>Operator Surface</h1>
           </div>
           <div class="hero-actions">
-            <span id="panelModeBadge" class="panel-badge">Pilot</span>
-            <button id="refresh" class="inline-action" type="button">Refresh</button>
+            <div class="mode-control">
+              <label class="sr-only" for="panelModeSelect">Operator mode</label>
+              <select id="panelModeSelect" class="panel-select">
+                <option value="observe">Observe</option>
+                <option value="assist">Assist</option>
+                <option value="pilot" selected>Pilot</option>
+                <option value="locked">Locked</option>
+              </select>
+            </div>
+            <button id="refresh" class="inline-action" type="button" aria-label="Refresh snapshot" title="Refresh snapshot">↻</button>
           </div>
         </div>
         <p class="lede">Persistent page intelligence, execution history, and release diagnostics.</p>
+        <p id="panelModePolicyNote" class="lede small">Pilot mode allows normal supported command execution.</p>
       </section>
 
       <section class="panel-card">

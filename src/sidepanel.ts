@@ -2,7 +2,8 @@ import { capabilitySummary, COMMAND_CAPABILITIES } from "./command-capabilities"
 import { CommandTrace, createOperatorSnapshot, OperatorSnapshot } from "./operator-snapshot";
 
 const refreshButton = document.getElementById("refresh") as HTMLButtonElement;
-const panelModeBadge = document.getElementById("panelModeBadge") as HTMLSpanElement;
+const panelModeSelect = document.getElementById("panelModeSelect") as HTMLSelectElement;
+const panelModePolicyNote = document.getElementById("panelModePolicyNote") as HTMLParagraphElement;
 
 const pageSite = document.getElementById("pageSite") as HTMLSpanElement;
 const pageTitle = document.getElementById("pageTitle") as HTMLSpanElement;
@@ -55,6 +56,7 @@ function normalizeSnapshot(snapshot: Partial<OperatorSnapshot> | undefined | nul
     diagnostics: { ...base.diagnostics, ...(snapshot.diagnostics || {}) },
     sitePolicy: { ...base.sitePolicy, ...(snapshot.sitePolicy || {}) },
     future: { ...base.future, ...(snapshot.future || {}) },
+    modePolicy: { ...base.modePolicy, ...(snapshot.modePolicy || {}) },
     history: Array.isArray(snapshot.history) ? snapshot.history : base.history,
     lifecycle: Array.isArray(snapshot.lifecycle) ? snapshot.lifecycle : base.lifecycle,
   };
@@ -98,7 +100,8 @@ function renderActivePage(snapshot: OperatorSnapshot) {
 }
 
 function renderMode(snapshot: OperatorSnapshot) {
-  panelModeBadge.textContent = titleCase(snapshot.mode);
+  panelModeSelect.value = snapshot.mode;
+  panelModePolicyNote.textContent = snapshot.modePolicy.note;
 }
 
 function renderHistoryItem(trace: CommandTrace) {
@@ -340,4 +343,14 @@ window.addEventListener("unload", () => {
 refreshButton.addEventListener("click", (event) => {
   event.preventDefault();
   fetchSnapshot();
+});
+
+panelModeSelect.addEventListener("change", () => {
+  chrome.runtime.sendMessage({ type: "set-mode", mode: panelModeSelect.value }, (response) => {
+    if (chrome.runtime.lastError || !response?.ok) {
+      fetchSnapshot();
+      return;
+    }
+    renderSnapshot(normalizeSnapshot(response.snapshot as Partial<OperatorSnapshot>));
+  });
 });

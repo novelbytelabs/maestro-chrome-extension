@@ -225,6 +225,15 @@ const overlayPolicyEnabledForTab = async (tabId?: number) => {
 
 const setOverlayPolicyForTab = async (tabId: number, enabled: boolean) => {
   await ensureOverlayPolicyLoaded();
+  const modePolicy = ipc.currentModePolicy();
+  if (enabled && !modePolicy.overlayCommandsAllowed) {
+    ipc.noteOverlayPolicy(tabId, false);
+    return {
+      ok: false,
+      error: "Overlay auto-show is disabled by the current operator mode.",
+      blockedByPolicy: true,
+    };
+  }
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (enabled && isSensitiveTab(tab)) {
     ipc.noteOverlayPolicy(tabId, false);
@@ -249,6 +258,13 @@ const applyOverlayPolicyToTab = async (tabId: number, force: boolean = false) =>
   if (!overlayPolicyTabIds.has(tabId)) {
     return { ok: false, skipped: true };
   }
+  const modePolicy = ipc.currentModePolicy();
+  if (!modePolicy.overlayCommandsAllowed) {
+    overlayPolicyTabIds.delete(tabId);
+    await persistOverlayPolicy();
+    ipc.noteOverlayPolicy(tabId, false);
+    return { ok: false, blockedByPolicy: true, error: "Overlay auto-show is disabled by the current operator mode." };
+  }
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (isSensitiveTab(tab)) {
     overlayPolicyTabIds.delete(tabId);
@@ -265,7 +281,7 @@ const applyOverlayPolicyToTab = async (tabId: number, force: boolean = false) =>
     type: "injected-script-command-request",
     data: {
       type: "COMMAND_TYPE_SHOW",
-      text: "all",
+      text: "links",
     },
   });
 };
@@ -385,12 +401,20 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.alarms.create("keepAlive", { periodInMinutes: 1 });
+chrome.alarms.create("connectionWatch", { periodInMinutes: 0.1 });
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name == "keepAlive") {
     ipc.noteKeepAlive("Periodic keepAlive alarm fired.");
     await ensureConnection();
     await ipc.refreshActivePage(false);
     await refreshOverlayPolicyForActiveTab(false);
+    return;
+  }
+
+  if (alarm.name == "connectionWatch") {
+    ipc.noteKeepAlive("Connection watchdog alarm fired.");
+    await ensureConnection();
+    await ipc.refreshActivePage(false);
   }
 });
 
@@ -460,6 +484,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type == "set-mode") {
+    const mode = String(message.mode || "").toLowerCase();
+    if (!["observe", "assist", "pilot", "locked"].includes(mode)) {
+      sendResponse({ ok: false, error: `Unsupported operator mode: ${mode}` });
+      return true;
+    }
+
+    ipc
+      .setMode(mode as any)
+      .then(async () => {
+        await ipc.refreshActivePage(true);
+        sendResponse({ ok: true, snapshot: await ipc.getOperatorSnapshot(false) });
+      })
+      .catch((error) => {
+        sendResponse({ ok: false, error: String(error) });
+      });
+    return true;
+  }
+
   if (message.type == "open-side-panel") {
     openSidePanel()
       .then((result) => {
@@ -476,14 +519,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(async (tab) => {
         const enabled = await overlayPolicyEnabledForTab(tab?.id);
         const blockedByPolicy = isSensitiveTab(tab);
+        const modePolicy = ipc.currentModePolicy();
         if (tab?.id) {
-          ipc.noteOverlayPolicy(tab.id, blockedByPolicy ? false : enabled);
+          ipc.noteOverlayPolicy(tab.id, blockedByPolicy || !modePolicy.overlayCommandsAllowed ? false : enabled);
         }
         sendResponse({
           ok: true,
           tabId: tab?.id,
-          enabled: blockedByPolicy ? false : enabled,
-          blockedByPolicy,
+          enabled: blockedByPolicy || !modePolicy.overlayCommandsAllowed ? false : enabled,
+          blockedByPolicy: blockedByPolicy || !modePolicy.overlayCommandsAllowed,
         });
       })
       .catch((error) => {

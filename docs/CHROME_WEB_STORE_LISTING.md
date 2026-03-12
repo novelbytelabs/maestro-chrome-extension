@@ -19,7 +19,7 @@ Public beta features:
 • Overlay commands - "show links", "show inputs", "show code", "use 1"
 • Tab control - "next tab", "switch tab two", "close tab", "duplicate tab"
 • Navigation - "back", "forward", "reload"
-• Site navigation - "go to google.com", "open new tab github.com"
+• Site navigation - "go to google.com", "open github.com"
 • Popup and side panel diagnostics for connection, routing, and lifecycle state
 
 How it works:

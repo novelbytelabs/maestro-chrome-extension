@@ -9,7 +9,6 @@ This document defines the Chrome-first command surface for the first public beta
 | `show links` | `COMMAND_TYPE_SHOW` | `content-script-direct` | stable | Number visible links, buttons, and link-like targets on the active page |
 | `show inputs` | `COMMAND_TYPE_SHOW` | `content-script-direct` | stable | Number visible input controls on the active page |
 | `show code` | `COMMAND_TYPE_SHOW` | `content-script-direct` | stable | Number visible code blocks on the active page |
-| `show all` | `COMMAND_TYPE_SHOW` | `content-script-direct` | stable | Number all visible actionable targets on the active page |
 | `use <n>` | `COMMAND_TYPE_USE` | `content-script-direct` | stable | Activate the numbered overlay target |
 | `cancel` | `COMMAND_TYPE_CANCEL` | `content-script-direct` | stable | Clear overlays on the active page |
 | `next tab` | `COMMAND_TYPE_NEXT_TAB` | `extension-worker` | stable | Activate the next tab in the current Chrome window |
@@ -22,7 +21,6 @@ This document defines the Chrome-first command surface for the first public beta
 | `forward` | `COMMAND_TYPE_FORWARD` | `content-script-direct` | stable | Navigate browser history forward |
 | `go to <site>` | `COMPAT_OPEN_SITE` | `browser-nav-compat` | compatibility | Navigate the active tab to a valid URL |
 | `open <site>` | `COMPAT_OPEN_SITE` | `browser-nav-compat` | compatibility | Navigate the active tab to a valid URL |
-| `open new tab <site>` | `COMPAT_OPEN_SITE_NEW_TAB` | `browser-nav-compat` | compatibility | Create a new tab and navigate to a valid URL |
 
 ## Degraded / Experimental Commands
 
@@ -48,12 +46,14 @@ These commands exist in the runtime and capability registry, but they are not pa
 ## Beta Support Boundaries
 
 The public beta commits to:
+
 - Chrome-first support
 - the command set in the production-supported table above
 - popup and side panel diagnostics
 - explicit degraded behavior instead of silent failures
 
 The public beta does not commit to:
+
 - arbitrary text-click automation
 - broad editor mutation reliability across all sites
 - full browser parity across Chrome, Edge, and Brave

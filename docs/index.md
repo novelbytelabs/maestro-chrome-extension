@@ -40,6 +40,7 @@ The Arqon Maestro Chrome Extension is a Chrome-first browser control layer for A
 The public beta supports the command surface defined in [Supported Commands](SUPPORTED_COMMANDS.md).
 
 The beta does not commit to:
+
 - arbitrary text-click automation
 - full editor automation parity across all sites
 - broad browser parity beyond Chrome-first support

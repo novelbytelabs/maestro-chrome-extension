@@ -4,32 +4,32 @@ Use this checklist before every public beta release candidate.
 
 ## 1. Startup and Cold Restart
 
-- [ ] Restart Chrome, Arqon Bus, and Arqon Maestro from a powered-off state
-- [ ] Reload the unpacked extension once after the build
-- [ ] Confirm popup shows `Connected to Arqon Bus`
-- [ ] Confirm side panel opens successfully
-- [ ] Confirm `show links` works without any debug helpers
-- [ ] Confirm `show links` still works after a browser restart
-- [ ] Confirm `Reconnect` works from the popup
+- [x] Restart Chrome, Arqon Bus, and Arqon Maestro from a powered-off state
+- [x] Reload the unpacked extension once after the build
+- [x] Confirm popup shows `Connected to Arqon Bus`
+- [x] Confirm side panel opens successfully
+- [x] Confirm `show links` works without any debug helpers
+- [x] Confirm `show links` still works after a browser restart
+- [x] Confirm `Reconnect` works from the popup
 
 ## 2. Bus Connection and Reconnect
 
-- [ ] Stop Arqon Bus while Chrome and Maestro remain running
-- [ ] Confirm popup and side panel show disconnected/backoff state
-- [ ] Restart Arqon Bus
-- [ ] Confirm worker reconnects without extension reload
-- [ ] Confirm supported commands work after reconnect
+- [x] Stop Arqon Bus while Chrome and Maestro remain running
+- [x] Confirm popup and side panel show disconnected/backoff state
+- [x] Restart Arqon Bus
+- [x] Confirm worker reconnects without extension reload
+- [x] Confirm supported commands work after reconnect
 - [ ] Confirm no `socket-not-open` regressions appear in Maestro logs
 
 ## 3. Popup and Side Panel Health
 
-- [ ] Popup loads without blank/error state
-- [ ] Active Page panel updates when switching tabs
+- [x] Popup loads without blank/error state
+- [x] Active Page panel updates when switching tabs
 - [ ] Last Action reflects the last supported command
-- [ ] Diagnostics render without `n/a` errors or thrown exceptions
-- [ ] Side panel execution ledger updates during normal use
-- [ ] Capability map renders correctly
-- [ ] Policy Preview reflects the current domain and runtime posture
+- [x] Diagnostics render without `n/a` errors or thrown exceptions
+- [x] Side panel execution ledger updates during normal use
+- [x] Capability map renders correctly
+- [x] Policy Preview reflects the current domain and runtime posture
 
 ## 4. Core Command QA
 

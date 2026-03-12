@@ -218,9 +218,6 @@ function selectorForShowText(text: string): string {
   if (text == "code") {
     return "pre, code";
   }
-  if (text == "all") {
-    return 'a, button, summary, [role="link"], [role="button"], input, textarea, [role="checkbox"], [role="radio"], label, [contenteditable="true"]';
-  }
   return "";
 }
 

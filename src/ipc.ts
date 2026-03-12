@@ -18,6 +18,7 @@ import {
 
 export default class IPC {
   private static readonly preferredTabStorageKey = "preferredTabId";
+  private static readonly modeStorageKey = "operatorMode";
   private static readonly historyStorageKey = "operatorHistory";
   private static readonly activePageStorageKey = "operatorActivePage";
   private static readonly maxHistoryEntries = 20;
@@ -36,6 +37,7 @@ export default class IPC {
   private readonly protocol: string = "maestro-plugin-v1";
   private messageCounter: number = 0;
   private connectingPromise?: Promise<boolean>;
+  private pendingForcedReconnect: boolean = false;
   private nextRetryAt: number = 0;
   private retryDelayMs: number = 0;
   private consecutiveFailures: number = 0;
@@ -70,6 +72,7 @@ export default class IPC {
     try {
       const stored = await chrome.storage.local.get([
         IPC.preferredTabStorageKey,
+        IPC.modeStorageKey,
         IPC.historyStorageKey,
         IPC.activePageStorageKey,
       ]);
@@ -79,8 +82,13 @@ export default class IPC {
         this.snapshot.targeting.preferredTabId = storedTabId;
       }
 
+      const storedMode = stored[IPC.modeStorageKey];
+      if (storedMode == "observe" || storedMode == "assist" || storedMode == "pilot" || storedMode == "locked") {
+        this.snapshot.mode = storedMode;
+      }
+
       if (Array.isArray(stored[IPC.historyStorageKey])) {
-        this.snapshot.history = stored[IPC.historyStorageKey].slice(0, IPC.maxHistoryEntries);
+        this.snapshot.history = this.sanitizeHistory(stored[IPC.historyStorageKey]);
         const latest = this.snapshot.history[0];
         if (latest) {
           this.syncLastActionFromTrace(latest);
@@ -92,6 +100,7 @@ export default class IPC {
         this.snapshot.activePage = Object.assign(emptyActivePageSummary(), activePage);
         this.syncSitePolicyState();
       }
+      this.syncModePolicyState();
     } catch (error) {
       this.setLastError(String(error));
     }
@@ -99,6 +108,7 @@ export default class IPC {
 
   private persistSnapshotFragments(): void {
     const payload: { [key: string]: any } = {
+      [IPC.modeStorageKey]: this.snapshot.mode,
       [IPC.historyStorageKey]: this.snapshot.history,
       [IPC.activePageStorageKey]: this.snapshot.activePage,
     };
@@ -130,8 +140,56 @@ export default class IPC {
     };
   }
 
+  private sanitizeHistory(traces: CommandTrace[]): CommandTrace[] {
+    return traces.filter((trace) => this.isUserFacingTrace(trace.commandType)).slice(0, IPC.maxHistoryEntries);
+  }
+
   private syncFutureState() {
     this.snapshot.future.rememberedCommandsCount = this.snapshot.history.length;
+  }
+
+  private syncModePolicyState() {
+    const effectiveMode = this.snapshot.sitePolicy.automationPolicy;
+    if (effectiveMode == "locked") {
+      this.snapshot.modePolicy = {
+        commandExecution: "blocked",
+        overlayCommandsAllowed: false,
+        navigationCommandsAllowed: false,
+        mutatingCommandsAllowed: false,
+        note: "Locked mode disables all browser automation.",
+      };
+      return;
+    }
+
+    if (effectiveMode == "observe") {
+      this.snapshot.modePolicy = {
+        commandExecution: "blocked",
+        overlayCommandsAllowed: false,
+        navigationCommandsAllowed: false,
+        mutatingCommandsAllowed: false,
+        note: "Observe mode keeps diagnostics live but blocks browser automation.",
+      };
+      return;
+    }
+
+    if (effectiveMode == "assist") {
+      this.snapshot.modePolicy = {
+        commandExecution: "limited",
+        overlayCommandsAllowed: true,
+        navigationCommandsAllowed: true,
+        mutatingCommandsAllowed: false,
+        note: "Assist mode allows overlays and low-risk navigation, but blocks mutating actions.",
+      };
+      return;
+    }
+
+    this.snapshot.modePolicy = {
+      commandExecution: "full",
+      overlayCommandsAllowed: true,
+      navigationCommandsAllowed: true,
+      mutatingCommandsAllowed: true,
+      note: "Pilot mode allows normal supported command execution.",
+    };
   }
 
   private syncSitePolicyState() {
@@ -149,6 +207,7 @@ export default class IPC {
       teachModeAllowed: !sensitiveDomain,
       dryRunRecommended: sensitiveDomain || this.snapshot.activePage.pageType == "dashboard",
     });
+    this.syncModePolicyState();
   }
 
   private isSensitiveHostname(hostname: string): boolean {
@@ -171,6 +230,70 @@ export default class IPC {
       "COMMAND_TYPE_DIFF",
       "COMMAND_TYPE_SELECT",
     ].includes(commandType);
+  }
+
+  private isModeBlockedCommand(commandType: string): boolean {
+    const effectiveMode = this.snapshot.sitePolicy.automationPolicy;
+    if (effectiveMode == "locked" || effectiveMode == "observe") {
+      return true;
+    }
+
+    if (effectiveMode != "assist") {
+      return false;
+    }
+
+    const capability = commandCapability(commandType);
+    if (!capability) {
+      return true;
+    }
+
+    if (commandType == "COMMAND_TYPE_SHOW" || commandType == "COMMAND_TYPE_CANCEL") {
+      return false;
+    }
+
+    if (capability.category == "navigation") {
+      return false;
+    }
+
+    if (capability.category == "browser") {
+      return [
+        "COMMAND_TYPE_NEXT_TAB",
+        "COMMAND_TYPE_PREVIOUS_TAB",
+        "COMMAND_TYPE_SWITCH_TAB",
+        "COMMAND_TYPE_RELOAD",
+      ].includes(commandType)
+        ? false
+        : true;
+    }
+
+    if (commandType == "COMPAT_OPEN_SITE") {
+      return true;
+    }
+
+    return true;
+  }
+
+  private modeBlockedResponse(commandType: string, label: string) {
+    const effectiveMode = this.snapshot.sitePolicy.automationPolicy;
+    const modeLabel = effectiveMode.charAt(0).toUpperCase() + effectiveMode.slice(1);
+    return {
+      ok: false,
+      error: `Blocked by operator mode ${modeLabel}: ${label}`,
+      blockedByMode: true,
+      commandType,
+    };
+  }
+
+  async setMode(mode: OperatorSnapshot["mode"]): Promise<OperatorSnapshot["mode"]> {
+    await this.ensurePersistedStateLoaded();
+    this.snapshot.mode = mode;
+    this.syncSitePolicyState();
+    this.persistSnapshotFragments();
+    return this.snapshot.mode;
+  }
+
+  currentModePolicy() {
+    return this.cloneSnapshot().modePolicy;
   }
 
   noteOverlayPolicy(tabId: number, enabled: boolean) {
@@ -249,9 +372,6 @@ export default class IPC {
 
     if (commandType == "COMPAT_OPEN_SITE") {
       return `go to ${text}`.trim();
-    }
-    if (commandType == "COMPAT_OPEN_SITE_NEW_TAB") {
-      return `open new tab ${text}`.trim();
     }
     if (commandType == "COMMAND_TYPE_SHOW") {
       return `show ${text}`.trim();
@@ -356,11 +476,18 @@ export default class IPC {
   }
 
   private pushTrace(trace: CommandTrace) {
-    this.snapshot.history = [trace].concat(this.snapshot.history).slice(0, IPC.maxHistoryEntries);
+    this.snapshot.history = this.sanitizeHistory([trace].concat(this.snapshot.history));
     this.syncLastActionFromTrace(trace);
     this.snapshot.diagnostics.compatibilityPathUsed = trace.compatibilityPathUsed;
     this.syncFutureState();
     this.persistSnapshotFragments();
+  }
+
+  private isUserFacingTrace(commandType: string): boolean {
+    return ![
+      "COMMAND_TYPE_GET_EDITOR_STATE",
+      "COMMAND_TYPE_CLICKABLE",
+    ].includes(commandType);
   }
 
   private isAddressBarFocusCommand(command: any): boolean {
@@ -382,13 +509,7 @@ export default class IPC {
   }
 
   private extractNavigationSequence(commands: any[], startIndex: number) {
-    let index = startIndex;
-    let createTab = false;
-
-    if (commands[index]?.type == "COMMAND_TYPE_CREATE_TAB") {
-      createTab = true;
-      index += 1;
-    }
+    const index = startIndex;
 
     if (!this.isAddressBarFocusCommand(commands[index])) {
       return undefined;
@@ -405,7 +526,6 @@ export default class IPC {
     }
 
     return {
-      createTab,
       url,
       consumedUntil: index + 2,
       commands: commands.slice(startIndex, index + 3),
@@ -458,7 +578,10 @@ export default class IPC {
     return null;
   }
 
-  private onClose() {
+  private onClose(socket?: WebSocket) {
+    if (socket && this.websocket && socket !== this.websocket) {
+      return;
+    }
     this.connected = false;
     this.websocket = undefined;
     this.consecutiveFailures += 1;
@@ -470,7 +593,10 @@ export default class IPC {
     this.setIcon();
   }
 
-  private async onMessage(message: any) {
+  private async onMessage(message: any, socket?: WebSocket) {
+    if (socket && this.websocket && socket !== this.websocket) {
+      return;
+    }
     if (typeof message != "string") {
       return;
     }
@@ -497,7 +623,13 @@ export default class IPC {
     }
   }
 
-  private onOpen() {
+  private onOpen(socket?: WebSocket) {
+    if (socket && this.websocket && socket !== this.websocket) {
+      try {
+        socket.close();
+      } catch (_error) {}
+      return;
+    }
     this.connected = true;
     this.retryDelayMs = 0;
     this.nextRetryAt = 0;
@@ -570,13 +702,13 @@ export default class IPC {
 
       socket.addEventListener("open", () => {
         clearTimeout(timeoutId);
-        this.onOpen();
+        this.onOpen(socket);
         finish(true);
       });
 
       socket.addEventListener("close", () => {
         clearTimeout(timeoutId);
-        this.onClose();
+        this.onClose(socket);
         finish(false);
       });
 
@@ -589,7 +721,7 @@ export default class IPC {
       });
 
       socket.addEventListener("message", (event) => {
-        this.onMessage(event.data);
+        this.onMessage(event.data, socket);
       });
     });
   }
@@ -606,6 +738,16 @@ export default class IPC {
     }
 
     if (this.connectingPromise) {
+      if (force) {
+        this.pendingForcedReconnect = true;
+        return this.connectingPromise.then((connected) => {
+          if (connected || !this.pendingForcedReconnect) {
+            return connected;
+          }
+          this.pendingForcedReconnect = false;
+          return this.ensureConnection(true);
+        });
+      }
       return this.connectingPromise;
     }
 
@@ -626,7 +768,14 @@ export default class IPC {
     this.recordLifecycle("worker-reconnect-attempt", force ? "Forced reconnect requested." : "Automatic reconnect attempt.");
 
     this.connectingPromise = (async () => {
-      const available = await this.probeAvailability();
+      if (force && this.websocket) {
+        try {
+          this.websocket.close();
+        } catch (_error) {}
+        this.websocket = undefined;
+      }
+
+      const available = force ? true : await this.probeAvailability();
       if (!available) {
         this.connected = false;
         this.websocket = undefined;
@@ -902,6 +1051,57 @@ export default class IPC {
     };
   }
 
+  private async sendOverlayCommandToBestFrame(tabId: number, message: any): Promise<any> {
+    let frameIds = await this.frameIdsForTab(tabId);
+    let attempts = await Promise.all(frameIds.map((frameId) => this.sendToFrame(tabId, frameId, message)));
+
+    const missingReceiver = attempts.every(
+      (attempt) => !attempt.ok && attempt.error == "Could not establish connection. Receiving end does not exist."
+    );
+
+    if (missingReceiver) {
+      try {
+        await this.ensureContentScript(tabId);
+      } catch (_error) {}
+      frameIds = await this.frameIdsForTab(tabId);
+      attempts = await Promise.all(frameIds.map((frameId) => this.sendToFrame(tabId, frameId, message)));
+    }
+
+    const successful = attempts.filter((attempt) => attempt.ok);
+    this.snapshot.diagnostics.contentScriptReachable = successful.length > 0;
+
+    if (successful.length == 0) {
+      return {
+        ok: false,
+        error: (attempts[0] && attempts[0].error) || "No frame responded",
+        targetTabId: tabId,
+        targetFrameId: null,
+        route: "content-script-direct" as DispatchRoute,
+      };
+    }
+
+    const preferred = successful.find((attempt) => attempt.response?.ok);
+    const winner = preferred || successful[0];
+
+    this.updateResolvedTarget({
+      tabId,
+      frameId: winner.frameId,
+      state: this.snapshot.targeting.targetResolutionState == "missing" ? "fallback" : "resolved",
+      source: "frame-analysis",
+      reason: "Selected the frame that retained the active overlay session.",
+    });
+
+    return {
+      ok: true,
+      response: winner.response,
+      targetTabId: tabId,
+      targetFrameId: winner.frameId,
+      route: "content-script-direct" as DispatchRoute,
+      frameIdsTried: frameIds,
+      attempts,
+    };
+  }
+
   private inferRouteFromContentResponse(command: any, response: any): DispatchRoute {
     const capability = commandCapability(String(command?.type || ""));
     if (capability) {
@@ -938,6 +1138,10 @@ export default class IPC {
 
     if (command?.type == "COMMAND_TYPE_SHOW") {
       return this.sendShowToBestFrame(tab.id, message);
+    }
+
+    if (command?.type == "COMMAND_TYPE_USE" || command?.type == "COMMAND_TYPE_CANCEL") {
+      return this.sendOverlayCommandToBestFrame(tab.id, message);
     }
 
     let attempt = await this.sendToTab(tab.id, message);
@@ -1093,9 +1297,7 @@ export default class IPC {
         const navigationSequence = this.extractNavigationSequence(commands, i);
         const capability = commandCapability(String(command?.type || ""));
         const effectiveCommandType = navigationSequence
-          ? navigationSequence.createTab
-            ? "COMPAT_OPEN_SITE_NEW_TAB"
-            : "COMPAT_OPEN_SITE"
+          ? "COMPAT_OPEN_SITE"
           : String(command?.type || "unknown");
         let route: DispatchRoute = capability ? capability.route : "unknown";
         let error: string | null = null;
@@ -1107,35 +1309,26 @@ export default class IPC {
 
         try {
           const sensitiveDomain = this.snapshot.sitePolicy.sensitiveDomain;
-          if (sensitiveDomain && this.isPolicyBlockedCommand(effectiveCommandType)) {
+          if (this.isModeBlockedCommand(effectiveCommandType)) {
+            handlerResponse = this.modeBlockedResponse(effectiveCommandType, label);
+          } else if (sensitiveDomain && this.isPolicyBlockedCommand(effectiveCommandType)) {
             handlerResponse = this.policyBlockedResponse(effectiveCommandType, label);
-          } else if (sensitiveDomain && command?.type == "COMMAND_TYPE_SHOW" && String(command?.text || "").toLowerCase() == "all") {
-            handlerResponse = this.policyBlockedResponse(String(command?.type || "unknown"), label);
           } else {
           if (navigationSequence) {
             route = "browser-nav-compat";
             compatibilityPathUsed = true;
-            label = this.deriveCommandLabel(
-              { type: navigationSequence.createTab ? "COMPAT_OPEN_SITE_NEW_TAB" : "COMPAT_OPEN_SITE" },
-              navigationSequence.url
-            );
-            normalizedPayload = this.normalizePayload(
-              { type: navigationSequence.createTab ? "COMPAT_OPEN_SITE_NEW_TAB" : "COMPAT_OPEN_SITE" },
-              navigationSequence.url
-            );
+            label = this.deriveCommandLabel({ type: "COMPAT_OPEN_SITE" }, navigationSequence.url);
+            normalizedPayload = this.normalizePayload({ type: "COMPAT_OPEN_SITE" }, navigationSequence.url);
             this.lastLiveCommand = {
               at: new Date().toISOString(),
               preferredTabId: this.preferredTabId,
               command: {
-                type: navigationSequence.createTab ? "COMPAT_OPEN_SITE_NEW_TAB" : "COMPAT_OPEN_SITE",
+                type: "COMPAT_OPEN_SITE",
                 text: navigationSequence.url,
                 commands: navigationSequence.commands,
               },
             };
-            handlerResponse = await this.extensionCommandHandler.navigateToSite(
-              navigationSequence.url,
-              navigationSequence.createTab
-            );
+            handlerResponse = await this.extensionCommandHandler.navigateToSite(navigationSequence.url, false);
             targetTabId = handlerResponse?.tabId ?? targetTabId;
             this.lastLiveCommand = Object.assign({}, this.lastLiveCommand || {}, {
               result: handlerResponse,
@@ -1200,9 +1393,7 @@ export default class IPC {
         const trace: CommandTrace = {
           timestamp: Date.now(),
           commandType: navigationSequence
-            ? navigationSequence.createTab
-              ? "COMPAT_OPEN_SITE_NEW_TAB"
-              : "COMPAT_OPEN_SITE"
+            ? "COMPAT_OPEN_SITE"
             : String(command?.type || "unknown"),
           label,
           normalizedPayload,
@@ -1220,9 +1411,13 @@ export default class IPC {
           legacyPathUsed: Boolean(capability?.legacy) || route == "injected" || compatibilityPathUsed,
           degradationReason: handlerResponse?.blockedByPolicy
             ? "Command was blocked by conservative site policy on a sensitive domain."
+            : handlerResponse?.blockedByMode
+            ? this.snapshot.modePolicy.note
             : this.degradationReason(capability, route, compatibilityPathUsed),
         };
-        this.pushTrace(trace);
+        if (this.isUserFacingTrace(trace.commandType)) {
+          this.pushTrace(trace);
+        }
       }
     }
 
