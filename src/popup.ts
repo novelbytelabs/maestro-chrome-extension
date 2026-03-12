@@ -94,12 +94,18 @@ function renderActivePage(snapshot: OperatorSnapshot) {
 
 function renderLastAction(snapshot: OperatorSnapshot) {
   const { lastAction } = snapshot;
+  const latestTrace = snapshot.history[0];
   lastActionCommand.textContent = lastAction.label || "No live command recorded yet";
-  lastActionRoute.textContent = lastAction.route ? titleCase(lastAction.route) : "n/a";
+  lastActionRoute.textContent =
+    lastAction.route && latestTrace?.supportLevel
+      ? `${titleCase(lastAction.route)} / ${titleCase(latestTrace.supportLevel)}`
+      : lastAction.route
+      ? titleCase(lastAction.route)
+      : "n/a";
   lastActionResult.textContent = lastAction.result ? titleCase(lastAction.result) : "n/a";
   lastActionLatency.textContent = lastAction.latencyMs === null ? "n/a" : `${lastAction.latencyMs} ms`;
-  lastActionError.textContent = lastAction.error || "No error recorded.";
-  lastActionError.classList.toggle("has-error", Boolean(lastAction.error));
+  lastActionError.textContent = lastAction.error || latestTrace?.degradationReason || "No error recorded.";
+  lastActionError.classList.toggle("has-error", Boolean(lastAction.error || latestTrace?.degradationReason));
 }
 
 function renderDiagnostics(snapshot: OperatorSnapshot) {
@@ -131,6 +137,7 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
     `Reinjections: ${snapshot.diagnostics.contentScriptReinjections} • ${
       snapshot.diagnostics.lastContentScriptReinjectionReason || "n/a"
     }`,
+    `Legacy history: ${snapshot.history.filter((trace) => trace.legacyPathUsed).length}`,
     `Compatibility path: ${snapshot.diagnostics.compatibilityPathUsed ? "used" : "not used"}`,
     `History depth: ${snapshot.history.length}`,
   ];

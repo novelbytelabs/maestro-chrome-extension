@@ -18,6 +18,7 @@ export type DispatchRoute =
   | "browser-nav-compat"
   | "unknown";
 export type CommandResult = "success" | "partial" | "blocked" | "fallback" | "failed";
+export type CommandSupportLevel = "stable" | "compatibility" | "experimental";
 
 export interface ActionableCounts {
   links: number;
@@ -52,10 +53,13 @@ export interface CommandTrace {
   targetResolutionSource: string | null;
   targetResolutionReason: string | null;
   route: DispatchRoute;
+  supportLevel: CommandSupportLevel;
   result: CommandResult;
   latencyMs: number;
   error: string | null;
   compatibilityPathUsed: boolean;
+  legacyPathUsed: boolean;
+  degradationReason: string | null;
 }
 
 export interface ResolvedTarget {

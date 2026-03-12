@@ -78,7 +78,9 @@ function renderHistoryItem(trace: CommandTrace) {
   item.appendChild(title);
 
   const route = document.createElement("p");
-  route.textContent = `Route: ${titleCase(trace.route)} • Result: ${titleCase(trace.result)}`;
+  route.textContent = `Route: ${titleCase(trace.route)} • Support: ${titleCase(trace.supportLevel)} • Result: ${titleCase(
+    trace.result
+  )}`;
   item.appendChild(route);
 
   const target = document.createElement("p");
@@ -97,6 +99,12 @@ function renderHistoryItem(trace: CommandTrace) {
     const error = document.createElement("p");
     error.textContent = `Error: ${trace.error}`;
     item.appendChild(error);
+  }
+
+  if (trace.degradationReason) {
+    const degraded = document.createElement("p");
+    degraded.textContent = `Degraded: ${trace.degradationReason}`;
+    item.appendChild(degraded);
   }
 
   const when = document.createElement("p");

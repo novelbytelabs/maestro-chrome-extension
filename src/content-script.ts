@@ -397,6 +397,18 @@ async function handleUseCommand(data: any) {
   };
 }
 
+function handleNavigationCommand(type: string) {
+  if (type == "COMMAND_TYPE_BACK") {
+    window.history.back();
+    return { ok: true, path: "content-script-direct" };
+  }
+  if (type == "COMMAND_TYPE_FORWARD") {
+    window.history.forward();
+    return { ok: true, path: "content-script-direct" };
+  }
+  return undefined;
+}
+
 let resolvers: { [k: number]: any } = [];
 document.addEventListener(`arqon-injected-script-command-response`, (e: any) => {
   if (resolvers[e.detail.id]) {
@@ -458,6 +470,11 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.type == "injected-script-command-request") {
     (async () => {
       try {
+        const directNavigation = handleNavigationCommand(request.data?.type);
+        if (directNavigation) {
+          sendResponse(directNavigation);
+          return;
+        }
         if (request.data?.type == "COMMAND_TYPE_SHOW") {
           sendResponse(handleShowCommand(request.data));
           return;

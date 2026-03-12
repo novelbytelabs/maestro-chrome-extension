@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import ExtensionCommandHandler from "./extension-command-handler";
-import { commandCapability } from "./command-capabilities";
+import { commandCapability, CommandCapability } from "./command-capabilities";
 import {
   ActivePageSummary,
   CommandResult,
@@ -250,6 +250,15 @@ export default class IPC {
   }
 
   private classifyResult(response: any, route: DispatchRoute, compatibilityPathUsed: boolean): CommandResult {
+    return this.classifyResultWithCapability(response, route, compatibilityPathUsed, undefined);
+  }
+
+  private classifyResultWithCapability(
+    response: any,
+    route: DispatchRoute,
+    compatibilityPathUsed: boolean,
+    capability?: CommandCapability
+  ): CommandResult {
     const error =
       (response && response.error) ||
       (response && response.data && response.data.error) ||
@@ -269,7 +278,28 @@ export default class IPC {
       return "fallback";
     }
 
+    if (capability?.support == "experimental" || capability?.legacy || route == "injected") {
+      return "partial";
+    }
+
     return "success";
+  }
+
+  private degradationReason(
+    capability: CommandCapability | undefined,
+    route: DispatchRoute,
+    compatibilityPathUsed: boolean
+  ): string | null {
+    if (compatibilityPathUsed || route == "browser-nav-compat") {
+      return capability?.note || "Legacy compatibility path was required for command execution.";
+    }
+    if (capability?.legacy || route == "injected") {
+      return capability?.note || "Command still depends on the injected-page bridge.";
+    }
+    if (capability?.support == "experimental") {
+      return capability?.note || "Command is still classified as experimental.";
+    }
+    return null;
   }
 
   private pushTrace(trace: CommandTrace) {
@@ -1104,10 +1134,13 @@ export default class IPC {
           targetResolutionSource: this.lastResolvedTargetDetails.source || null,
           targetResolutionReason: this.lastResolvedTargetDetails.reason || null,
           route,
-          result: this.classifyResult(handlerResponse, route, compatibilityPathUsed),
+          supportLevel: capability?.support || (compatibilityPathUsed ? "compatibility" : "experimental"),
+          result: this.classifyResultWithCapability(handlerResponse, route, compatibilityPathUsed, capability),
           latencyMs: Date.now() - startedAt,
           error,
           compatibilityPathUsed,
+          legacyPathUsed: Boolean(capability?.legacy) || route == "injected" || compatibilityPathUsed,
+          degradationReason: this.degradationReason(capability, route, compatibilityPathUsed),
         };
         this.pushTrace(trace);
       }

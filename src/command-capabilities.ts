@@ -1,7 +1,6 @@
-import { DispatchRoute } from "./operator-snapshot";
+import { CommandSupportLevel, DispatchRoute } from "./operator-snapshot";
 
 export type CommandCategory = "browser" | "page" | "editor" | "navigation" | "compat";
-export type CommandSupportLevel = "stable" | "compatibility" | "experimental";
 
 export interface CommandCapability {
   type: string;
@@ -10,6 +9,7 @@ export interface CommandCapability {
   route: DispatchRoute;
   support: CommandSupportLevel;
   note?: string;
+  legacy?: boolean;
 }
 
 export const COMMAND_CAPABILITIES: CommandCapability[] = [
@@ -20,6 +20,7 @@ export const COMMAND_CAPABILITIES: CommandCapability[] = [
     route: "browser-nav-compat",
     support: "compatibility",
     note: "Uses legacy address-bar navigation compatibility sequence.",
+    legacy: true,
   },
   {
     type: "COMPAT_OPEN_SITE_NEW_TAB",
@@ -28,6 +29,7 @@ export const COMMAND_CAPABILITIES: CommandCapability[] = [
     route: "browser-nav-compat",
     support: "compatibility",
     note: "Uses legacy create-tab plus address-bar compatibility sequence.",
+    legacy: true,
   },
   { type: "COMMAND_TYPE_CLOSE_TAB", label: "Close tab", category: "browser", route: "extension-worker", support: "stable" },
   { type: "COMMAND_TYPE_CREATE_TAB", label: "Create tab", category: "browser", route: "extension-worker", support: "stable" },
@@ -59,8 +61,8 @@ export const COMMAND_CAPABILITIES: CommandCapability[] = [
     route: "content-script-direct",
     support: "stable",
   },
-  { type: "COMMAND_TYPE_BACK", label: "Back", category: "navigation", route: "injected", support: "stable" },
-  { type: "COMMAND_TYPE_FORWARD", label: "Forward", category: "navigation", route: "injected", support: "stable" },
+  { type: "COMMAND_TYPE_BACK", label: "Back", category: "navigation", route: "content-script-direct", support: "stable" },
+  { type: "COMMAND_TYPE_FORWARD", label: "Forward", category: "navigation", route: "content-script-direct", support: "stable" },
   {
     type: "COMMAND_TYPE_CLICK",
     label: "Click target",
@@ -68,6 +70,7 @@ export const COMMAND_CAPABILITIES: CommandCapability[] = [
     route: "injected",
     support: "experimental",
     note: "Still depends on injected-page selectors and matching heuristics.",
+    legacy: true,
   },
   {
     type: "COMMAND_TYPE_CLICKABLE",
@@ -75,12 +78,13 @@ export const COMMAND_CAPABILITIES: CommandCapability[] = [
     category: "page",
     route: "injected",
     support: "experimental",
+    legacy: true,
   },
-  { type: "COMMAND_TYPE_DOM_BLUR", label: "Blur selector", category: "page", route: "injected", support: "experimental" },
-  { type: "COMMAND_TYPE_DOM_CLICK", label: "Click selector", category: "page", route: "injected", support: "experimental" },
-  { type: "COMMAND_TYPE_DOM_COPY", label: "Copy selector", category: "page", route: "injected", support: "experimental" },
-  { type: "COMMAND_TYPE_DOM_FOCUS", label: "Focus selector", category: "page", route: "injected", support: "experimental" },
-  { type: "COMMAND_TYPE_DOM_SCROLL", label: "Scroll selector", category: "page", route: "injected", support: "experimental" },
+  { type: "COMMAND_TYPE_DOM_BLUR", label: "Blur selector", category: "page", route: "injected", support: "experimental", legacy: true },
+  { type: "COMMAND_TYPE_DOM_CLICK", label: "Click selector", category: "page", route: "injected", support: "experimental", legacy: true },
+  { type: "COMMAND_TYPE_DOM_COPY", label: "Copy selector", category: "page", route: "injected", support: "experimental", legacy: true },
+  { type: "COMMAND_TYPE_DOM_FOCUS", label: "Focus selector", category: "page", route: "injected", support: "experimental", legacy: true },
+  { type: "COMMAND_TYPE_DOM_SCROLL", label: "Scroll selector", category: "page", route: "injected", support: "experimental", legacy: true },
   {
     type: "COMMAND_TYPE_SCROLL",
     label: "Scroll page",
@@ -88,12 +92,13 @@ export const COMMAND_CAPABILITIES: CommandCapability[] = [
     route: "injected",
     support: "experimental",
     note: "Injected-page scroll heuristics depend on hovered container and DOM shape.",
+    legacy: true,
   },
-  { type: "COMMAND_TYPE_DIFF", label: "Apply diff", category: "editor", route: "injected", support: "experimental" },
-  { type: "COMMAND_TYPE_GET_EDITOR_STATE", label: "Get editor state", category: "editor", route: "injected", support: "experimental" },
-  { type: "COMMAND_TYPE_REDO", label: "Redo", category: "editor", route: "injected", support: "experimental" },
-  { type: "COMMAND_TYPE_SELECT", label: "Select range", category: "editor", route: "injected", support: "experimental" },
-  { type: "COMMAND_TYPE_UNDO", label: "Undo", category: "editor", route: "injected", support: "experimental" },
+  { type: "COMMAND_TYPE_DIFF", label: "Apply diff", category: "editor", route: "injected", support: "experimental", legacy: true },
+  { type: "COMMAND_TYPE_GET_EDITOR_STATE", label: "Get editor state", category: "editor", route: "injected", support: "experimental", legacy: true },
+  { type: "COMMAND_TYPE_REDO", label: "Redo", category: "editor", route: "injected", support: "experimental", legacy: true },
+  { type: "COMMAND_TYPE_SELECT", label: "Select range", category: "editor", route: "injected", support: "experimental", legacy: true },
+  { type: "COMMAND_TYPE_UNDO", label: "Undo", category: "editor", route: "injected", support: "experimental", legacy: true },
 ];
 
 export function commandCapability(commandType: string): CommandCapability | undefined {
