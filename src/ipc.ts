@@ -32,7 +32,6 @@ export default class IPC {
   private id: string = "";
   private websocket?: WebSocket;
   private url: string = "ws://localhost:9100/?room=maestro&channel=plugin.chrome";
-  private readonly probeUrl: string = "http://localhost:9100/";
   private readonly room: string = "maestro";
   private readonly channel: string = "plugin.chrome";
   private readonly protocol: string = "maestro-plugin-v1";
@@ -654,24 +653,6 @@ export default class IPC {
     this.recordLifecycle("worker-backoff", `Retry scheduled in ${this.retryDelayMs}ms.`);
   }
 
-  private async probeAvailability(): Promise<boolean> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1500);
-
-    try {
-      await fetch(this.probeUrl, {
-        method: "GET",
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      return true;
-    } catch (_error) {
-      return false;
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
   private async openWebSocket(): Promise<boolean> {
     return new Promise((resolve) => {
       let settled = false;
@@ -771,15 +752,6 @@ export default class IPC {
           this.websocket.close();
         } catch (_error) {}
         this.websocket = undefined;
-      }
-
-      const available = force ? true : await this.probeAvailability();
-      if (!available) {
-        this.connected = false;
-        this.websocket = undefined;
-        this.scheduleRetry();
-        this.setIcon();
-        return false;
       }
 
       try {

@@ -42,17 +42,23 @@ theme:
 
 
 nav:
-  - Overview: index.md
-  - Supported Commands: SUPPORTED_COMMANDS.md
-  - Production Readiness Checklist: PRODUCTION_READINESS_CHECKLIST.md
-  - Command QA Matrix: COMMAND_QA_MATRIX.md
-  - Site Compatibility Sweep: SITE_COMPATIBILITY_SWEEP.md
-  - Chrome Web Store Listing: CHROME_WEB_STORE_LISTING.md
-  - Local Runbook: LOCAL_RUNBOOK.md
-  - Phase 3 Runbook: PHASE3_RUNBOOK.md
-  - Troubleshooting: TROUBLESHOOTING.md
-  - Technical Specification: SPEC.md
-  - Implementation Plan: IMPLEMENTATION_PLAN.md
+  - Welcome: index.md
+  - User Guide:
+      - Quick Start: browser/getting-started.md
+      - Supported Commands: SUPPORTED_COMMANDS.md
+      - Troubleshooting: TROUBLESHOOTING.md
+  - Technical Docs:
+      - Technical Specification: SPEC.md
+      - Implementation Plan: IMPLEMENTATION_PLAN.md
+      - Tech Note: TECH_NOTE.md
+  - Readiness & QA:
+      - Production Readiness Checklist: PRODUCTION_READINESS_CHECKLIST.md
+      - Command QA Matrix: COMMAND_QA_MATRIX.md
+      - Site Compatibility Sweep: SITE_COMPATIBILITY_SWEEP.md
+  - Delivery:
+      - Chrome Web Store Listing: CHROME_WEB_STORE_LISTING.md
+      - Local Runbook: LOCAL_RUNBOOK.md
+      - Phase 3 Runbook: PHASE3_RUNBOOK.md
 
 markdown_extensions:
   - attr_list

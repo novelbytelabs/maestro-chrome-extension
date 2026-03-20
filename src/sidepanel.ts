@@ -172,9 +172,12 @@ function renderHistory(snapshot: OperatorSnapshot) {
   });
 }
 
-function diagnosticItem(titleText: string, bodyText: string) {
+function diagnosticItem(titleText: string, bodyText: string, tooltipText?: string) {
   const item = document.createElement("article");
   item.className = "diagnostic-item";
+  if (tooltipText) {
+    item.setAttribute("data-tooltip", tooltipText);
+  }
   const title = document.createElement("h3");
   title.textContent = titleText;
   item.appendChild(title);
@@ -286,7 +289,8 @@ function renderCapabilities() {
         capability.label,
         `${titleCase(capability.support)} • ${titleCase(capability.category)} • ${titleCase(capability.route)} • ${capability.type}${
           capability.note ? ` • ${capability.note}` : ""
-        }`
+        }`,
+        capability.description
       )
     );
   });
