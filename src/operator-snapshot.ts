@@ -204,6 +204,18 @@ export interface OperatorSnapshot {
     passkeyLastProviderOutcome: "none" | "verified" | "failed";
     passkeyLastProviderReasonCode: string;
     passkeyLastProviderOutcomeAt: string;
+    passkeyOutcomeAckStatus:
+      | "none"
+      | "pending"
+      | "matched"
+      | "mismatch"
+      | "timeout"
+      | "bridge_error"
+      | "invalid_ack";
+    passkeyOutcomePendingRequestId: string;
+    passkeyOutcomeLastAckRequestId: string;
+    passkeyOutcomeLastAckAt: string;
+    passkeyOutcomeLastAckMessage: string;
     lifecycleMonotonicResetAt: number | null;
   };
 }
@@ -330,6 +342,11 @@ export function createOperatorSnapshot(): OperatorSnapshot {
       passkeyLastProviderOutcome: "none",
       passkeyLastProviderReasonCode: "",
       passkeyLastProviderOutcomeAt: "",
+      passkeyOutcomeAckStatus: "none",
+      passkeyOutcomePendingRequestId: "",
+      passkeyOutcomeLastAckRequestId: "",
+      passkeyOutcomeLastAckAt: "",
+      passkeyOutcomeLastAckMessage: "",
       lifecycleMonotonicResetAt: null,
     },
   };

@@ -238,6 +238,16 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
   );
   diagnosticsList.appendChild(
     diagnosticItem(
+      "Passkey ack correlation",
+      `Status ${titleCase(snapshot.security.passkeyOutcomeAckStatus)} • pending ${
+        snapshot.security.passkeyOutcomePendingRequestId || "n/a"
+      } • last ack ${snapshot.security.passkeyOutcomeLastAckRequestId || "n/a"} • ${
+        snapshot.security.passkeyOutcomeLastAckMessage || "n/a"
+      }`
+    )
+  );
+  diagnosticsList.appendChild(
+    diagnosticItem(
       "Last page context",
       `Updated ${relativeTime(snapshot.diagnostics.lastPageContextAt)} • compatibility path ${
         snapshot.diagnostics.compatibilityPathUsed ? "used" : "not used"

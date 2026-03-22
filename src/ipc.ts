@@ -787,6 +787,37 @@ export default class IPC {
     delete this.pendingSecurityRequests[requestId];
   }
 
+  private setPasskeyOutcomeAckState(
+    status:
+      | "none"
+      | "pending"
+      | "matched"
+      | "mismatch"
+      | "timeout"
+      | "bridge_error"
+      | "invalid_ack",
+    patch?: {
+      pendingRequestId?: string;
+      ackRequestId?: string;
+      message?: string;
+      at?: string;
+    }
+  ) {
+    this.snapshot.security.passkeyOutcomeAckStatus = status;
+    if (patch?.pendingRequestId !== undefined) {
+      this.snapshot.security.passkeyOutcomePendingRequestId = patch.pendingRequestId;
+    }
+    if (patch?.ackRequestId !== undefined) {
+      this.snapshot.security.passkeyOutcomeLastAckRequestId = patch.ackRequestId;
+    }
+    if (patch?.message !== undefined) {
+      this.snapshot.security.passkeyOutcomeLastAckMessage = patch.message;
+    }
+    if (patch?.at !== undefined) {
+      this.snapshot.security.passkeyOutcomeLastAckAt = patch.at;
+    }
+  }
+
   private startSecurityRequest(
     message: SecurityRequestMessage,
     requestId: string,
@@ -817,6 +848,15 @@ export default class IPC {
           "security bridge unavailable after retry budget exhausted",
           requestId
         );
+      }
+      if (message == "securityReportPasskeyProviderOutcome") {
+        this.setPasskeyOutcomeAckState("timeout", {
+          pendingRequestId: "",
+          ackRequestId: requestId,
+          message: "provider outcome ack timeout",
+          at: new Date().toISOString(),
+        });
+        this.recordLifecycle("page-context", `security_provider_outcome_ack_timeout:${requestId}`);
       }
       reject(new Error("security_bridge_timeout"));
     }, SECURITY_BRIDGE_TIMEOUT_MS);
@@ -889,6 +929,11 @@ export default class IPC {
     }
 
     const requestPromise = new Promise((resolve, reject) => {
+      this.setPasskeyOutcomeAckState("pending", {
+        pendingRequestId: normalized.requestId,
+        ackRequestId: "",
+        message: "provider outcome sent; awaiting correlated ack",
+      });
       this.startSecurityRequest(
         "securityReportPasskeyProviderOutcome",
         normalized.requestId,
@@ -900,6 +945,13 @@ export default class IPC {
           this.snapshot.security.passkeyLastProviderOutcome = normalized.verified ? "verified" : "failed";
           this.snapshot.security.passkeyLastProviderReasonCode = normalized.reasonCode;
           this.snapshot.security.passkeyLastProviderOutcomeAt = new Date().toISOString();
+          this.setPasskeyOutcomeAckState("matched", {
+            pendingRequestId: "",
+            ackRequestId: normalized.requestId,
+            message: "provider outcome ack matched requestId",
+            at: new Date().toISOString(),
+          });
+          this.recordLifecycle("page-context", `security_provider_outcome_ack_matched:${normalized.requestId}`);
           this.persistSnapshotFragments();
           await this.refreshSecuritySnapshot().catch(() => undefined);
           resolve(ack);
@@ -924,6 +976,13 @@ export default class IPC {
         const errorCode = String(payload?.errorCode || "security_bridge_invalid_payload") as SecurityBridgeErrorCode;
         this.setSecurityBridgeError(errorCode, String(payload?.errorMessage || "security bridge error"), requestId);
       } else if (message == "securityReportPasskeyProviderOutcomeAck") {
+        this.setPasskeyOutcomeAckState("mismatch", {
+          pendingRequestId: "",
+          ackRequestId: requestId,
+          message: "provider outcome ack requestId mismatch (no pending request)",
+          at: new Date().toISOString(),
+        });
+        this.recordLifecycle("page-context", `security_provider_outcome_ack_mismatch:${requestId}`);
         this.setSecurityBridgeError(
           "security_bridge_invalid_payload",
           "security passkey provider outcome ack requestId mismatch",
@@ -936,6 +995,15 @@ export default class IPC {
     if (message == "securityBridgeError") {
       const errorCode = String(payload?.errorCode || "security_bridge_invalid_payload") as SecurityBridgeErrorCode;
       this.setSecurityBridgeError(errorCode, String(payload?.errorMessage || "security bridge error"), requestId);
+      if (pending.message == "securityReportPasskeyProviderOutcome") {
+        this.setPasskeyOutcomeAckState("bridge_error", {
+          pendingRequestId: "",
+          ackRequestId: requestId,
+          message: `provider outcome bridge error: ${errorCode}`,
+          at: new Date().toISOString(),
+        });
+        this.recordLifecycle("page-context", `security_provider_outcome_ack_bridge_error:${requestId}:${errorCode}`);
+      }
       pending.reject(new Error(errorCode));
       return;
     }
@@ -943,6 +1011,13 @@ export default class IPC {
       const validationError = validatePasskeyProviderOutcomeAck(payload);
       if (validationError) {
         this.setSecurityBridgeError(validationError, "security passkey provider outcome ack is invalid", requestId);
+        this.setPasskeyOutcomeAckState("invalid_ack", {
+          pendingRequestId: "",
+          ackRequestId: requestId,
+          message: `provider outcome ack invalid: ${validationError}`,
+          at: new Date().toISOString(),
+        });
+        this.recordLifecycle("page-context", `security_provider_outcome_ack_invalid:${requestId}:${validationError}`);
         pending.reject(new Error(validationError));
         return;
       }

@@ -196,6 +196,12 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
       snapshot.security.passkeyLastProviderOutcome
     )} • reason ${snapshot.security.passkeyLastProviderReasonCode || "n/a"}`,
     `Passkey outcome at: ${snapshot.security.passkeyLastProviderOutcomeAt || "n/a"}`,
+    `Passkey ack status: ${titleCase(snapshot.security.passkeyOutcomeAckStatus)} • pending ${
+      snapshot.security.passkeyOutcomePendingRequestId || "n/a"
+    } • last ack ${snapshot.security.passkeyOutcomeLastAckRequestId || "n/a"}`,
+    `Passkey ack detail: ${snapshot.security.passkeyOutcomeLastAckMessage || "n/a"} • at ${
+      snapshot.security.passkeyOutcomeLastAckAt || "n/a"
+    }`,
   ];
 
   diagnosticsContent.innerHTML = "";
