@@ -179,6 +179,33 @@ export interface OperatorSnapshot {
   sitePolicy: SitePolicyPreview;
   future: FutureFeatureState;
   modePolicy: ModePolicy;
+  security: {
+    bridgeHealthy: boolean;
+    bridgeUnavailableAt: number | null;
+    bridgeLastErrorCode: string | null;
+    bridgeLastErrorMessage: string | null;
+    bridgeLastRequestId: string | null;
+    bridgeLastUpdatedAt: number | null;
+    contractVersion: string;
+    policyMode: "observe" | "assist" | "pilot" | "locked";
+    requiresReauthNext: boolean;
+    graceValid: boolean;
+    graceExpiresAt: string;
+    lastReasonCode: string;
+    lastLifecyclePhase: string;
+    lastInteractionId: number;
+    replayGeneratedAt: string;
+    replayTotalRecords: number;
+    replaySessionEventCount: number;
+    replayLastSequence: number;
+    passkeyProviderChallengeActive: boolean;
+    passkeyProviderChallengeId: string;
+    passkeyLastProviderName: string;
+    passkeyLastProviderOutcome: "none" | "verified" | "failed";
+    passkeyLastProviderReasonCode: string;
+    passkeyLastProviderOutcomeAt: string;
+    lifecycleMonotonicResetAt: number | null;
+  };
 }
 
 export function emptyActionableCounts(): ActionableCounts {
@@ -277,6 +304,33 @@ export function createOperatorSnapshot(): OperatorSnapshot {
       navigationCommandsAllowed: true,
       mutatingCommandsAllowed: true,
       note: "Pilot mode allows normal supported command execution.",
+    },
+    security: {
+      bridgeHealthy: false,
+      bridgeUnavailableAt: null,
+      bridgeLastErrorCode: null,
+      bridgeLastErrorMessage: null,
+      bridgeLastRequestId: null,
+      bridgeLastUpdatedAt: null,
+      contractVersion: "a1.v1",
+      policyMode: "assist",
+      requiresReauthNext: false,
+      graceValid: false,
+      graceExpiresAt: "",
+      lastReasonCode: "",
+      lastLifecyclePhase: "heard",
+      lastInteractionId: 0,
+      replayGeneratedAt: "",
+      replayTotalRecords: 0,
+      replaySessionEventCount: 0,
+      replayLastSequence: 0,
+      passkeyProviderChallengeActive: false,
+      passkeyProviderChallengeId: "",
+      passkeyLastProviderName: "",
+      passkeyLastProviderOutcome: "none",
+      passkeyLastProviderReasonCode: "",
+      passkeyLastProviderOutcomeAt: "",
+      lifecycleMonotonicResetAt: null,
     },
   };
 }

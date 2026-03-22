@@ -1,0 +1,10 @@
+{
+  "requestId": "req_provider_001",
+  "securityContractVersion": "a1.v1",
+  "app": "chrome",
+  "provider": "webauthn",
+  "challengeId": "challenge_123",
+  "verified": true,
+  "method": "passkey",
+  "reasonCode": ""
+}

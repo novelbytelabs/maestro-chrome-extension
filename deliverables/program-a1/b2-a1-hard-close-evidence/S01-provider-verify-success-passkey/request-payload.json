@@ -1,0 +1,9 @@
+{
+  "requestId": "req_...cess",
+  "securityContractVersion": "a1.v1",
+  "provider": "weba...uthn",
+  "verified": true,
+  "method": "passkey",
+  "challengeId": "chal..._s01",
+  "reasonCode": ""
+}

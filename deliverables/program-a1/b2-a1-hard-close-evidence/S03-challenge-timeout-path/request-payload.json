@@ -1,0 +1,9 @@
+{
+  "requestId": "req_...eout",
+  "securityContractVersion": "a1.v1",
+  "provider": "weba...uthn",
+  "verified": true,
+  "method": "passkey",
+  "challengeId": "chal..._s03",
+  "reasonCode": "timeout_probe"
+}

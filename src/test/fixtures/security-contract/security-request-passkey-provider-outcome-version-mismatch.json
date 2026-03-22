@@ -1,0 +1,9 @@
+{
+  "requestId": "req_provider_003",
+  "securityContractVersion": "a1.v0",
+  "provider": "webauthn",
+  "verified": false,
+  "method": "totp_recovery",
+  "challengeId": "challenge_125",
+  "reasonCode": "version_mismatch_probe"
+}

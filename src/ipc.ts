@@ -16,6 +16,46 @@ import {
   TargetResolutionState,
 } from "./operator-snapshot";
 import { isSensitiveUrl } from "./sensitive-url";
+import {
+  createSecurityBridgeRequest,
+  hasOwn,
+  isReflexCommandType,
+  SecurityPasskeyProviderMethod,
+  SECURITY_BRIDGE_RETRY_DELAYS_MS,
+  SECURITY_BRIDGE_TIMEOUT_MS,
+  SECURITY_CONTRACT_VERSION,
+  securityBridgeUnavailableThresholdMs,
+  SecurityBridgeErrorCode,
+  validateContractVersion,
+  validatePasskeyProviderOutcomeAck,
+  validatePasskeyProviderOutcomeRequest,
+  validateRequestId,
+} from "./security-contract";
+
+type SecurityRequestMessage =
+  | "securityRequestSnapshot"
+  | "securityRequestReplaySummary"
+  | "securityRequestReplaySnapshot"
+  | "securityResetReplaySnapshot"
+  | "securityReportPasskeyProviderOutcome";
+
+interface ReportPasskeyProviderOutcomeInput {
+  provider: string;
+  verified: boolean;
+  method: SecurityPasskeyProviderMethod;
+  challengeId?: string;
+  reasonCode?: string;
+}
+
+interface PendingSecurityRequest {
+  requestId: string;
+  message: SecurityRequestMessage;
+  attempt: number;
+  startedAt: number;
+  timeoutId: ReturnType<typeof setTimeout>;
+  resolve: (value: any) => void;
+  reject: (error: Error) => void;
+}
 
 export default class IPC {
   private static readonly preferredTabStorageKey = "preferredTabId";
@@ -55,6 +95,11 @@ export default class IPC {
   private snapshot: OperatorSnapshot = createOperatorSnapshot();
   private lastAnalyzeAtByTabId: { [tabId: number]: number } = {};
   private overlayPolicyByTabId: { [tabId: number]: boolean } = {};
+  private pendingSecurityRequests: { [requestId: string]: PendingSecurityRequest } = {};
+  private pendingProviderOutcomeByFingerprint: { [fingerprint: string]: Promise<any> | undefined } = {};
+  private securityBootstrapInFlight: boolean = false;
+  private lastSecurityMonotonicInteractionId: number = 0;
+  private lastSecurityLifecycleDedupeKey: string = "";
 
   constructor(app: string, extensionCommandHandler: ExtensionCommandHandler) {
     this.app = app;
@@ -147,6 +192,105 @@ export default class IPC {
 
   private syncFutureState() {
     this.snapshot.future.rememberedCommandsCount = this.snapshot.history.length;
+  }
+
+  private setSecurityBridgeError(errorCode: SecurityBridgeErrorCode, errorMessage: string, requestId?: string) {
+    this.snapshot.security.bridgeHealthy = false;
+    this.snapshot.security.bridgeLastErrorCode = errorCode;
+    this.snapshot.security.bridgeLastErrorMessage = errorMessage;
+    if (requestId) {
+      this.snapshot.security.bridgeLastRequestId = requestId;
+    }
+    if (errorCode == "security_bridge_unavailable") {
+      this.snapshot.security.bridgeUnavailableAt = Date.now();
+    }
+  }
+
+  private setSecurityBridgeHealthy(requestId?: string) {
+    this.snapshot.security.bridgeHealthy = true;
+    this.snapshot.security.bridgeUnavailableAt = null;
+    this.snapshot.security.bridgeLastErrorCode = null;
+    this.snapshot.security.bridgeLastErrorMessage = null;
+    if (requestId) {
+      this.snapshot.security.bridgeLastRequestId = requestId;
+    }
+  }
+
+  private applySecuritySnapshot(payload: any, source: "snapshot" | "summary" | "bridge") {
+    const versionError = validateContractVersion(payload);
+    if (versionError) {
+      this.setSecurityBridgeError(versionError, "security contract version mismatch", payload?.requestId);
+      return;
+    }
+    const requestIdError = source == "bridge" ? null : validateRequestId(payload);
+    if (requestIdError) {
+      this.setSecurityBridgeError(requestIdError, "security requestId is invalid", payload?.requestId);
+      return;
+    }
+
+    if (source != "summary") {
+      const nextInteractionId = Number(payload?.securityLastInteractionId || 0);
+      const shouldResetMonotonic = payload?.monotonicReset === true;
+      if (shouldResetMonotonic) {
+        this.lastSecurityMonotonicInteractionId = nextInteractionId;
+        this.snapshot.security.lifecycleMonotonicResetAt = Date.now();
+      } else if (
+        nextInteractionId > 0 &&
+        this.lastSecurityMonotonicInteractionId > 0 &&
+        nextInteractionId < this.lastSecurityMonotonicInteractionId
+      ) {
+        this.setSecurityBridgeError(
+          "security_bridge_invalid_payload",
+          "security interactionId monotonicity violation",
+          payload?.requestId
+        );
+        return;
+      } else if (nextInteractionId > this.lastSecurityMonotonicInteractionId) {
+        this.lastSecurityMonotonicInteractionId = nextInteractionId;
+      }
+      this.snapshot.security.policyMode = String(payload?.securityPolicyMode || this.snapshot.security.policyMode) as any;
+      this.snapshot.security.requiresReauthNext = Boolean(payload?.securityRequiresReauthNext);
+      this.snapshot.security.graceValid = Boolean(payload?.securityGraceValid);
+      this.snapshot.security.graceExpiresAt = String(payload?.securityGraceExpiresAt || "");
+      this.snapshot.security.lastReasonCode = String(payload?.securityLastReasonCode || "");
+      this.snapshot.security.lastLifecyclePhase = String(payload?.securityLastLifecyclePhase || "heard");
+      this.snapshot.security.lastInteractionId = nextInteractionId;
+      this.snapshot.security.passkeyProviderChallengeActive = Boolean(payload?.securityPasskeyProviderChallengeActive);
+      this.snapshot.security.passkeyProviderChallengeId = String(payload?.securityPasskeyProviderChallengeId || "");
+      this.snapshot.security.passkeyLastProviderName = String(payload?.securityPasskeyLastProviderName || "");
+      const providerOutcome = String(payload?.securityPasskeyLastProviderOutcome || "none");
+      this.snapshot.security.passkeyLastProviderOutcome =
+        providerOutcome == "verified" || providerOutcome == "failed" ? (providerOutcome as any) : "none";
+      this.snapshot.security.passkeyLastProviderReasonCode = String(payload?.securityPasskeyLastProviderReasonCode || "");
+      this.snapshot.security.passkeyLastProviderOutcomeAt = String(payload?.securityPasskeyLastProviderOutcomeAt || "");
+      const dedupeKey = `${this.snapshot.security.lastLifecyclePhase}:${this.snapshot.security.lastInteractionId || 0}`;
+      if (this.lastSecurityLifecycleDedupeKey !== dedupeKey) {
+        this.lastSecurityLifecycleDedupeKey = dedupeKey;
+        this.recordLifecycle("page-context", `security_${dedupeKey}`);
+      }
+    }
+
+    this.snapshot.security.replayGeneratedAt = String(
+      payload?.securityReplayGeneratedAt || payload?.generatedAt || this.snapshot.security.replayGeneratedAt || ""
+    );
+    this.snapshot.security.replayTotalRecords = Number(
+      payload?.securityReplayTotalRecords ?? payload?.totalRecords ?? this.snapshot.security.replayTotalRecords
+    );
+    this.snapshot.security.replaySessionEventCount = Number(
+      payload?.securityReplaySessionEventCount ??
+        payload?.recordsByCategory?.security_session_event ??
+        this.snapshot.security.replaySessionEventCount
+    );
+    this.snapshot.security.replayLastSequence = Number(
+      payload?.securityReplayLastSequence ?? payload?.lastSequence ?? this.snapshot.security.replayLastSequence
+    );
+    this.snapshot.security.bridgeLastUpdatedAt = Date.now();
+    this.snapshot.security.contractVersion = SECURITY_CONTRACT_VERSION;
+    this.setSecurityBridgeHealthy(payload?.requestId);
+  }
+
+  private nextSecurityRequestId(): string {
+    return `sec_${this.nextMessageId()}`;
   }
 
   private syncModePolicyState() {
@@ -269,6 +413,61 @@ export default class IPC {
     return true;
   }
 
+  private commandRiskLevel(commandType: string): "low" | "medium" | "high" {
+    if (isReflexCommandType(commandType)) {
+      return "low";
+    }
+    if (
+      [
+        "COMMAND_TYPE_DIFF",
+        "COMMAND_TYPE_INSERT",
+        "COMMAND_TYPE_PASTE",
+        "COMMAND_TYPE_RUN",
+        "COMMAND_TYPE_USE",
+        "COMMAND_TYPE_CLICK",
+        "COMMAND_TYPE_DOM_CLICK",
+        "COMMAND_TYPE_DOM_FOCUS",
+        "COMMAND_TYPE_DOM_BLUR",
+        "COMMAND_TYPE_SELECT",
+      ].includes(commandType)
+    ) {
+      return "medium";
+    }
+    if (
+      [
+        "COMMAND_TYPE_DELETE",
+        "COMMAND_TYPE_CLOSE_TAB",
+        "COMMAND_TYPE_CREATE_TAB",
+        "COMMAND_TYPE_DUPLICATE_TAB",
+      ].includes(commandType)
+    ) {
+      return "high";
+    }
+    return "low";
+  }
+
+  private failClosedForSecurityBridge(commandType: string): boolean {
+    if (isReflexCommandType(commandType)) {
+      return false;
+    }
+    const risk = this.commandRiskLevel(commandType);
+    if (risk == "low") {
+      return false;
+    }
+    const unavailable = !this.snapshot.security.bridgeHealthy && this.snapshot.security.bridgeUnavailableAt !== null;
+    return unavailable;
+  }
+
+  private securityBridgeBlockedResponse(commandType: string, label: string) {
+    return {
+      ok: false,
+      error: `Blocked by security bridge availability policy: ${label}`,
+      blockedBySecurityBridge: true,
+      errorCode: "security_bridge_unavailable",
+      commandType,
+    };
+  }
+
   private modeBlockedResponse(commandType: string, label: string) {
     const effectiveMode = this.snapshot.sitePolicy.automationPolicy;
     const modeLabel = effectiveMode.charAt(0).toUpperCase() + effectiveMode.slice(1);
@@ -285,6 +484,10 @@ export default class IPC {
     this.snapshot.mode = mode;
     this.snapshot.requestedMode = mode;
     this.syncSitePolicyState();
+    this.send("securitySetPolicyMode", {
+      ...createSecurityBridgeRequest(this.nextSecurityRequestId()),
+      mode: this.snapshot.sitePolicy.automationPolicy || mode,
+    });
     this.persistSnapshotFragments();
     return this.snapshot.mode;
   }
@@ -575,6 +778,213 @@ export default class IPC {
     return null;
   }
 
+  private clearPendingSecurityRequest(requestId: string) {
+    const pending = this.pendingSecurityRequests[requestId];
+    if (!pending) {
+      return;
+    }
+    clearTimeout(pending.timeoutId);
+    delete this.pendingSecurityRequests[requestId];
+  }
+
+  private startSecurityRequest(
+    message: SecurityRequestMessage,
+    requestId: string,
+    attempt: number,
+    resolve: (value: any) => void,
+    reject: (error: Error) => void,
+    payloadOverride?: any
+  ) {
+    const payload = payloadOverride || createSecurityBridgeRequest(requestId);
+    const sent = this.send(message, payload);
+    if (!sent) {
+      reject(new Error("security_bridge_unavailable"));
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      this.clearPendingSecurityRequest(requestId);
+      if (attempt < SECURITY_BRIDGE_RETRY_DELAYS_MS.length + 1) {
+        const backoffMs = SECURITY_BRIDGE_RETRY_DELAYS_MS[attempt - 1] || SECURITY_BRIDGE_RETRY_DELAYS_MS[1];
+        setTimeout(() => {
+          this.startSecurityRequest(message, requestId, attempt + 1, resolve, reject, payload);
+        }, backoffMs);
+        return;
+      }
+      this.setSecurityBridgeError("security_bridge_timeout", `${message} timed out`, requestId);
+      if (Date.now() - (this.snapshot.security.bridgeLastUpdatedAt || 0) >= securityBridgeUnavailableThresholdMs()) {
+        this.setSecurityBridgeError(
+          "security_bridge_unavailable",
+          "security bridge unavailable after retry budget exhausted",
+          requestId
+        );
+      }
+      reject(new Error("security_bridge_timeout"));
+    }, SECURITY_BRIDGE_TIMEOUT_MS);
+
+    this.pendingSecurityRequests[requestId] = {
+      requestId,
+      message,
+      attempt,
+      startedAt: Date.now(),
+      timeoutId,
+      resolve,
+      reject,
+    };
+  }
+
+  private requestSecurityChannel(message: SecurityRequestMessage): Promise<any> {
+    const requestId = this.nextSecurityRequestId();
+    return new Promise((resolve, reject) => {
+      this.startSecurityRequest(message, requestId, 1, resolve, reject);
+    });
+  }
+
+  beginPasskeyProviderChallenge(challengeId?: string): { ok: boolean; challengeId: string } {
+    this.snapshot.security.passkeyProviderChallengeActive = true;
+    this.snapshot.security.passkeyProviderChallengeId = String(challengeId || "").trim();
+    this.snapshot.security.passkeyLastProviderReasonCode = "";
+    this.recordLifecycle(
+      "page-context",
+      this.snapshot.security.passkeyProviderChallengeId
+        ? `security_passkey_challenge_started:${this.snapshot.security.passkeyProviderChallengeId}`
+        : "security_passkey_challenge_started"
+    );
+    this.persistSnapshotFragments();
+    return {
+      ok: true,
+      challengeId: this.snapshot.security.passkeyProviderChallengeId,
+    };
+  }
+
+  private providerOutcomeFingerprint(input: ReportPasskeyProviderOutcomeInput): string {
+    return [
+      input.provider.trim(),
+      input.verified ? "verified" : "failed",
+      input.method,
+      String(input.challengeId || "").trim(),
+      String(input.reasonCode || "").trim(),
+    ].join("|");
+  }
+
+  async reportPasskeyProviderOutcome(input: ReportPasskeyProviderOutcomeInput): Promise<any> {
+    const normalized = {
+      ...createSecurityBridgeRequest(this.nextSecurityRequestId()),
+      provider: String(input.provider || "").trim(),
+      verified: Boolean(input.verified),
+      method: input.method,
+      challengeId: String(
+        input.challengeId !== undefined ? input.challengeId : this.snapshot.security.passkeyProviderChallengeId || ""
+      ).trim(),
+      reasonCode: String(input.reasonCode || "").trim(),
+    };
+    const validationError = validatePasskeyProviderOutcomeRequest(normalized);
+    if (validationError) {
+      this.setSecurityBridgeError(validationError, "security passkey provider outcome request is invalid", normalized.requestId);
+      throw new Error(validationError);
+    }
+
+    const fingerprint = this.providerOutcomeFingerprint(normalized);
+    if (this.pendingProviderOutcomeByFingerprint[fingerprint]) {
+      return this.pendingProviderOutcomeByFingerprint[fingerprint];
+    }
+
+    const requestPromise = new Promise((resolve, reject) => {
+      this.startSecurityRequest(
+        "securityReportPasskeyProviderOutcome",
+        normalized.requestId,
+        1,
+        async (ack) => {
+          this.snapshot.security.passkeyProviderChallengeActive = false;
+          this.snapshot.security.passkeyProviderChallengeId = "";
+          this.snapshot.security.passkeyLastProviderName = normalized.provider;
+          this.snapshot.security.passkeyLastProviderOutcome = normalized.verified ? "verified" : "failed";
+          this.snapshot.security.passkeyLastProviderReasonCode = normalized.reasonCode;
+          this.snapshot.security.passkeyLastProviderOutcomeAt = new Date().toISOString();
+          this.persistSnapshotFragments();
+          await this.refreshSecuritySnapshot().catch(() => undefined);
+          resolve(ack);
+        },
+        reject,
+        normalized
+      );
+    })
+      .finally(() => {
+        delete this.pendingProviderOutcomeByFingerprint[fingerprint];
+      });
+
+    this.pendingProviderOutcomeByFingerprint[fingerprint] = requestPromise;
+    return requestPromise;
+  }
+
+  private resolveSecurityRequest(message: string, payload: any) {
+    const requestId = String(payload?.requestId || "");
+    const pending = this.pendingSecurityRequests[requestId];
+    if (!pending) {
+      if (message == "securityBridgeError") {
+        const errorCode = String(payload?.errorCode || "security_bridge_invalid_payload") as SecurityBridgeErrorCode;
+        this.setSecurityBridgeError(errorCode, String(payload?.errorMessage || "security bridge error"), requestId);
+      } else if (message == "securityReportPasskeyProviderOutcomeAck") {
+        this.setSecurityBridgeError(
+          "security_bridge_invalid_payload",
+          "security passkey provider outcome ack requestId mismatch",
+          requestId
+        );
+      }
+      return;
+    }
+    this.clearPendingSecurityRequest(requestId);
+    if (message == "securityBridgeError") {
+      const errorCode = String(payload?.errorCode || "security_bridge_invalid_payload") as SecurityBridgeErrorCode;
+      this.setSecurityBridgeError(errorCode, String(payload?.errorMessage || "security bridge error"), requestId);
+      pending.reject(new Error(errorCode));
+      return;
+    }
+    if (message == "securityReportPasskeyProviderOutcomeAck") {
+      const validationError = validatePasskeyProviderOutcomeAck(payload);
+      if (validationError) {
+        this.setSecurityBridgeError(validationError, "security passkey provider outcome ack is invalid", requestId);
+        pending.reject(new Error(validationError));
+        return;
+      }
+      pending.resolve(payload);
+      this.persistSnapshotFragments();
+      return;
+    }
+    this.applySecuritySnapshot(payload, message == "securityReplaySummary" ? "summary" : "snapshot");
+    pending.resolve(payload);
+    this.persistSnapshotFragments();
+  }
+
+  async bootstrapSecurityBridge(force: boolean = false): Promise<void> {
+    if (this.securityBootstrapInFlight && !force) {
+      return;
+    }
+    this.securityBootstrapInFlight = true;
+    try {
+      if (force) {
+        this.lastSecurityMonotonicInteractionId = 0;
+        this.lastSecurityLifecycleDedupeKey = "";
+        this.snapshot.security.lifecycleMonotonicResetAt = Date.now();
+      }
+      await this.requestSecurityChannel("securityRequestSnapshot");
+      await this.requestSecurityChannel("securityRequestReplaySummary");
+      // Optional warm snapshot for diagnostics drill-down support.
+      await this.requestSecurityChannel("securityRequestReplaySnapshot").catch(() => undefined);
+      this.send("securitySetPolicyMode", {
+        ...createSecurityBridgeRequest(this.nextSecurityRequestId()),
+        mode: this.snapshot.sitePolicy.automationPolicy || this.snapshot.mode,
+      });
+      this.send("securitySubscribe", createSecurityBridgeRequest(this.nextSecurityRequestId()));
+    } catch (error) {
+      this.setSecurityBridgeError(
+        "security_bridge_unavailable",
+        String(error || "security bridge bootstrap failed")
+      );
+    } finally {
+      this.securityBootstrapInFlight = false;
+    }
+  }
+
   private onClose(socket?: WebSocket) {
     if (socket && this.websocket && socket !== this.websocket) {
       return;
@@ -587,6 +997,11 @@ export default class IPC {
       reconnectState: this.retryDelayMs > 0 ? "backoff" : "failed",
     });
     this.recordLifecycle("worker-disconnect", "WebSocket connection closed.");
+    Object.keys(this.pendingSecurityRequests).forEach((requestId) => {
+      const pending = this.pendingSecurityRequests[requestId];
+      this.clearPendingSecurityRequest(requestId);
+      pending.reject(new Error("security_bridge_unavailable"));
+    });
     this.setIcon();
   }
 
@@ -606,6 +1021,23 @@ export default class IPC {
     }
 
     if (!request) {
+      return;
+    }
+
+    if (
+      request.message == "securitySnapshot" ||
+      request.message == "securityReplaySummary" ||
+      request.message == "securityReplaySnapshot" ||
+      request.message == "securityReportPasskeyProviderOutcomeAck" ||
+      request.message == "securityBridgeError"
+    ) {
+      this.resolveSecurityRequest(request.message, request.data || {});
+      return;
+    }
+
+    if (request.message == "securityBridgeState") {
+      this.applySecuritySnapshot(request.data || {}, "bridge");
+      this.persistSnapshotFragments();
       return;
     }
 
@@ -639,6 +1071,7 @@ export default class IPC {
     });
     this.recordLifecycle("worker-connect", "WebSocket connection opened.");
     this.sendActive();
+    void this.bootstrapSecurityBridge(true);
     this.setIcon();
   }
 
@@ -713,6 +1146,9 @@ export default class IPC {
         busConnected: true,
         reconnectState: "connected",
       });
+      if (!this.snapshot.security.bridgeHealthy) {
+        void this.bootstrapSecurityBridge(false);
+      }
       return true;
     }
 
@@ -868,10 +1304,30 @@ export default class IPC {
 
   async getOperatorSnapshot(forceAnalysis: boolean = false): Promise<OperatorSnapshot> {
     await this.ensurePersistedStateLoaded();
+    if (this.connected && !this.snapshot.security.bridgeHealthy) {
+      await this.bootstrapSecurityBridge(false);
+    }
     if (forceAnalysis) {
       await this.refreshActivePage(true);
     }
     return this.cloneSnapshot();
+  }
+
+  async refreshSecuritySnapshot(): Promise<void> {
+    await this.requestSecurityChannel("securityRequestSnapshot");
+    await this.requestSecurityChannel("securityRequestReplaySummary");
+  }
+
+  async requestReplaySnapshot(): Promise<any> {
+    return this.requestSecurityChannel("securityRequestReplaySnapshot");
+  }
+
+  async requestReplaySummary(): Promise<any> {
+    return this.requestSecurityChannel("securityRequestReplaySummary");
+  }
+
+  async resetReplaySnapshot(): Promise<any> {
+    return this.requestSecurityChannel("securityResetReplaySnapshot");
   }
 
   async refreshActivePage(force: boolean = false): Promise<ActivePageSummary> {
@@ -1279,7 +1735,9 @@ export default class IPC {
 
         try {
           const sensitiveDomain = this.snapshot.sitePolicy.sensitiveDomain;
-          if (this.isModeBlockedCommand(effectiveCommandType)) {
+          if (this.failClosedForSecurityBridge(effectiveCommandType)) {
+            handlerResponse = this.securityBridgeBlockedResponse(effectiveCommandType, label);
+          } else if (this.isModeBlockedCommand(effectiveCommandType)) {
             handlerResponse = this.modeBlockedResponse(effectiveCommandType, label);
           } else if (sensitiveDomain && this.isPolicyBlockedCommand(effectiveCommandType)) {
             handlerResponse = this.policyBlockedResponse(effectiveCommandType, label);
@@ -1381,6 +1839,8 @@ export default class IPC {
           legacyPathUsed: Boolean(capability?.legacy) || route == "injected" || compatibilityPathUsed,
           degradationReason: handlerResponse?.blockedByPolicy
             ? "Command was blocked by conservative site policy on a sensitive domain."
+            : handlerResponse?.blockedBySecurityBridge
+            ? "Security bridge unavailable after retry budget. Medium/high executable command failed closed."
             : handlerResponse?.blockedByMode
             ? this.snapshot.modePolicy.note
             : this.degradationReason(capability, route, compatibilityPathUsed),

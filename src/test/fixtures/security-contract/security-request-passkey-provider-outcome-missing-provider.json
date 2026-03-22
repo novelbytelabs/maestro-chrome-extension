@@ -1,0 +1,8 @@
+{
+  "requestId": "req_provider_002",
+  "securityContractVersion": "a1.v1",
+  "verified": false,
+  "method": "passkey",
+  "challengeId": "challenge_124",
+  "reasonCode": "provider_unavailable"
+}

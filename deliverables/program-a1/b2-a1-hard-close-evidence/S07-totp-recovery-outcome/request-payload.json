@@ -1,0 +1,9 @@
+{
+  "requestId": "req_...totp",
+  "securityContractVersion": "a1.v1",
+  "provider": "totp...totp",
+  "verified": true,
+  "method": "totp_recovery",
+  "challengeId": "chal..._s07",
+  "reasonCode": ""
+}

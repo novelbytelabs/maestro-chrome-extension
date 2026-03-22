@@ -1,0 +1,15 @@
+{
+  "requestId": "req_001",
+  "securityContractVersion": "a1.v1",
+  "securityPolicyMode": "assist",
+  "securityRequiresReauthNext": false,
+  "securityGraceValid": true,
+  "securityGraceExpiresAt": "2026-03-21T12:00:00.000Z",
+  "securityLastReasonCode": "ingress_heard_no_transition",
+  "securityLastLifecyclePhase": "heard",
+  "securityLastInteractionId": 42,
+  "securityReplayGeneratedAt": "2026-03-21T12:00:00.000Z",
+  "securityReplayTotalRecords": 4,
+  "securityReplaySessionEventCount": 2,
+  "securityReplayLastSequence": 90
+}

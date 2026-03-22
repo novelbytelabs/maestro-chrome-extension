@@ -51,6 +51,7 @@ const ensureConnection = async (force: boolean = false) => {
   if (connected) {
     ipc.sendActive();
     ipc.sendHeartbeat();
+    await ipc.bootstrapSecurityBridge(force);
   }
 };
 
@@ -475,6 +476,87 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       .catch((error) => {
         sendResponse({ ok: false, error: String(error) });
+      });
+    return true;
+  }
+
+  if (message.type == "security-refresh") {
+    ipc
+      .refreshSecuritySnapshot()
+      .then(async () => {
+        sendResponse({ ok: true, snapshot: await ipc.getOperatorSnapshot(false) });
+      })
+      .catch((error) => {
+        sendResponse({ ok: false, error: String(error) });
+      });
+    return true;
+  }
+
+  if (message.type == "security-reset-replay") {
+    ipc
+      .resetReplaySnapshot()
+      .then(async () => {
+        await ipc.refreshSecuritySnapshot();
+        sendResponse({ ok: true, snapshot: await ipc.getOperatorSnapshot(false) });
+      })
+      .catch((error) => {
+        sendResponse({ ok: false, error: String(error) });
+      });
+    return true;
+  }
+
+  if (message.type == "security-export-artifact") {
+    ipc
+      .getOperatorSnapshot(false)
+      .then((snapshot) => {
+        sendResponse({
+          ok: true,
+          exportedAt: new Date().toISOString(),
+          security: snapshot.security,
+          history: snapshot.history.slice(0, 50),
+          lifecycle: snapshot.lifecycle.slice(0, 50),
+        });
+      })
+      .catch((error) => {
+        sendResponse({ ok: false, error: String(error) });
+      });
+    return true;
+  }
+
+  if (message.type == "security-begin-passkey-provider-challenge") {
+    try {
+      const result = ipc.beginPasskeyProviderChallenge(String(message.challengeId || "").trim());
+      ipc
+        .getOperatorSnapshot(false)
+        .then((snapshot) => {
+          sendResponse({ ok: true, result, snapshot });
+        })
+        .catch((error) => {
+          sendResponse({ ok: false, error: String(error) });
+        });
+    } catch (error) {
+      sendResponse({ ok: false, error: String(error) });
+    }
+    return true;
+  }
+
+  if (message.type == "security-report-passkey-provider-outcome") {
+    const provider = String(message.provider || "").trim();
+    const method: "passkey" | "totp_recovery" = message.method === "totp_recovery" ? "totp_recovery" : "passkey";
+    const payload = {
+      provider,
+      verified: Boolean(message.verified),
+      method,
+      challengeId: String(message.challengeId || "").trim(),
+      reasonCode: String(message.reasonCode || "").trim(),
+    };
+    ipc
+      .reportPasskeyProviderOutcome(payload)
+      .then(async (ack) => {
+        sendResponse({ ok: true, ack, snapshot: await ipc.getOperatorSnapshot(false) });
+      })
+      .catch(async (error) => {
+        sendResponse({ ok: false, error: String(error), snapshot: await ipc.getOperatorSnapshot(false).catch(() => undefined) });
       });
     return true;
   }

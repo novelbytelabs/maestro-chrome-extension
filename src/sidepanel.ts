@@ -21,6 +21,14 @@ const policyDomain = document.getElementById("policyDomain") as HTMLSpanElement;
 const policyOverlay = document.getElementById("policyOverlay") as HTMLSpanElement;
 const policyAutomation = document.getElementById("policyAutomation") as HTMLSpanElement;
 const policyDryRun = document.getElementById("policyDryRun") as HTMLSpanElement;
+const securityReplayRefresh = document.getElementById("securityReplayRefresh") as HTMLButtonElement;
+const securityReplayReset = document.getElementById("securityReplayReset") as HTMLButtonElement;
+const securityPolicyModePanel = document.getElementById("securityPolicyModePanel") as HTMLSpanElement;
+const securityRequiresReauthPanel = document.getElementById("securityRequiresReauthPanel") as HTMLSpanElement;
+const securityReplayTotalPanel = document.getElementById("securityReplayTotalPanel") as HTMLSpanElement;
+const securityReplaySessionPanel = document.getElementById("securityReplaySessionPanel") as HTMLSpanElement;
+const securityReplaySequencePanel = document.getElementById("securityReplaySequencePanel") as HTMLSpanElement;
+const securityBridgeStatusPanel = document.getElementById("securityBridgeStatusPanel") as HTMLParagraphElement;
 
 const historyList = document.getElementById("historyList") as HTMLDivElement;
 const diagnosticsList = document.getElementById("diagnosticsList") as HTMLDivElement;
@@ -57,6 +65,7 @@ function normalizeSnapshot(snapshot: Partial<OperatorSnapshot> | undefined | nul
     sitePolicy: { ...base.sitePolicy, ...(snapshot.sitePolicy || {}) },
     future: { ...base.future, ...(snapshot.future || {}) },
     modePolicy: { ...base.modePolicy, ...(snapshot.modePolicy || {}) },
+    security: { ...base.security, ...((snapshot as any).security || {}) },
     history: Array.isArray(snapshot.history) ? snapshot.history : base.history,
     lifecycle: Array.isArray(snapshot.lifecycle) ? snapshot.lifecycle : base.lifecycle,
   };
@@ -274,7 +283,7 @@ function renderLifecycle(snapshot: OperatorSnapshot) {
   });
 }
 
-function renderCapabilities() {
+function renderCapabilities(snapshot: OperatorSnapshot) {
   capabilityList.innerHTML = "";
   const summary = capabilitySummary();
   capabilityList.appendChild(
@@ -284,9 +293,10 @@ function renderCapabilities() {
     )
   );
   COMMAND_CAPABILITIES.forEach((capability) => {
+    const label = capability.label.replace("<site>", snapshot.activePage.hostname || "site");
     capabilityList.appendChild(
       diagnosticItem(
-        capability.label,
+        label,
         `${titleCase(capability.support)} • ${titleCase(capability.category)} • ${titleCase(capability.route)} • ${capability.type}${
           capability.note ? ` • ${capability.note}` : ""
         }`,
@@ -305,6 +315,27 @@ function renderPolicy(snapshot: OperatorSnapshot) {
   policyDryRun.textContent = snapshot.sitePolicy.dryRunRecommended ? "Recommended" : "Not required";
 }
 
+function renderSecurity(snapshot: OperatorSnapshot) {
+  securityPolicyModePanel.textContent = titleCase(snapshot.security.policyMode);
+  securityRequiresReauthPanel.textContent = snapshot.security.requiresReauthNext ? "Yes" : "No";
+  securityReplayTotalPanel.textContent = String(snapshot.security.replayTotalRecords || 0);
+  securityReplaySessionPanel.textContent = String(snapshot.security.replaySessionEventCount || 0);
+  securityReplaySequencePanel.textContent = String(snapshot.security.replayLastSequence || 0);
+  securityBridgeStatusPanel.textContent = snapshot.security.bridgeHealthy
+    ? `Bridge healthy • last update ${relativeTime(snapshot.security.bridgeLastUpdatedAt)}`
+    : `Bridge unavailable • ${snapshot.security.bridgeLastErrorCode || "n/a"}${
+        snapshot.security.bridgeLastErrorMessage ? ` (${snapshot.security.bridgeLastErrorMessage})` : ""
+      }`;
+  const providerDetail = `Provider ${snapshot.security.passkeyLastProviderName || "n/a"} • outcome ${titleCase(
+    snapshot.security.passkeyLastProviderOutcome
+  )} • reason ${snapshot.security.passkeyLastProviderReasonCode || "n/a"}${
+    snapshot.security.passkeyProviderChallengeActive
+      ? ` • challenge active${snapshot.security.passkeyProviderChallengeId ? ` (${snapshot.security.passkeyProviderChallengeId})` : ""}`
+      : ""
+  }`;
+  securityBridgeStatusPanel.textContent = `${securityBridgeStatusPanel.textContent}\n${providerDetail}`;
+}
+
 function renderSnapshot(snapshot: OperatorSnapshot) {
   renderMode(snapshot);
   renderActivePage(snapshot);
@@ -312,6 +343,8 @@ function renderSnapshot(snapshot: OperatorSnapshot) {
   renderDiagnostics(snapshot);
   renderLifecycle(snapshot);
   renderPolicy(snapshot);
+  renderSecurity(snapshot);
+  renderCapabilities(snapshot);
 }
 
 function fetchSnapshot() {
@@ -341,7 +374,6 @@ function scheduleRefresh() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  renderCapabilities();
   fetchSnapshot();
   scheduleRefresh();
 });
@@ -357,12 +389,24 @@ refreshButton.addEventListener("click", (event) => {
   fetchSnapshot();
 });
 
-panelModeSelect.addEventListener("change", () => {
+  panelModeSelect.addEventListener("change", () => {
   chrome.runtime.sendMessage({ type: "set-mode", mode: panelModeSelect.value }, (response) => {
     if (chrome.runtime.lastError || !response?.ok) {
       fetchSnapshot();
       return;
     }
     renderSnapshot(normalizeSnapshot(response.snapshot as Partial<OperatorSnapshot>));
+  });
+
+  securityReplayRefresh.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "security-refresh" }, () => {
+      fetchSnapshot();
+    });
+  });
+
+  securityReplayReset.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "security-reset-replay" }, () => {
+      fetchSnapshot();
+    });
   });
 });

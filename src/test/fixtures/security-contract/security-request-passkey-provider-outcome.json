@@ -1,0 +1,9 @@
+{
+  "requestId": "req_provider_001",
+  "securityContractVersion": "a1.v1",
+  "provider": "webauthn",
+  "verified": true,
+  "method": "passkey",
+  "challengeId": "challenge_123",
+  "reasonCode": ""
+}

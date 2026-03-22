@@ -1,0 +1,9 @@
+{
+  "requestId": "req_...able",
+  "securityContractVersion": "a1.v1",
+  "provider": "weba...uthn",
+  "verified": true,
+  "method": "passkey",
+  "challengeId": "chal..._s04",
+  "reasonCode": "bridge_unavailable_probe"
+}

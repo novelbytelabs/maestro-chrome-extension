@@ -28,6 +28,14 @@ const lastActionLatency = document.getElementById("lastActionLatency") as HTMLSp
 const lastActionError = document.getElementById("lastActionError") as HTMLParagraphElement;
 
 const diagnosticsContent = document.getElementById("diagnosticsContent") as HTMLDivElement;
+const securityRefreshButton = document.getElementById("securityRefresh") as HTMLButtonElement;
+const securityResetButton = document.getElementById("securityReset") as HTMLButtonElement;
+const securityPolicyMode = document.getElementById("securityPolicyMode") as HTMLSpanElement;
+const securityRequiresReauth = document.getElementById("securityRequiresReauth") as HTMLSpanElement;
+const securityReplayTotal = document.getElementById("securityReplayTotal") as HTMLSpanElement;
+const securityReplaySessionEvents = document.getElementById("securityReplaySessionEvents") as HTMLSpanElement;
+const securityReplayLastSequence = document.getElementById("securityReplayLastSequence") as HTMLSpanElement;
+const securityBridgeStatus = document.getElementById("securityBridgeStatus") as HTMLParagraphElement;
 let refreshTimer: number | undefined;
 let reconnectInFlight = false;
 
@@ -60,6 +68,7 @@ function normalizeSnapshot(snapshot: Partial<OperatorSnapshot> | undefined | nul
     sitePolicy: { ...base.sitePolicy, ...(snapshot.sitePolicy || {}) },
     future: { ...base.future, ...(snapshot.future || {}) },
     modePolicy: { ...base.modePolicy, ...(snapshot.modePolicy || {}) },
+    security: { ...base.security, ...((snapshot as any).security || {}) },
     history: Array.isArray(snapshot.history) ? snapshot.history : base.history,
     lifecycle: Array.isArray(snapshot.lifecycle) ? snapshot.lifecycle : base.lifecycle,
   };
@@ -180,6 +189,13 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
     `Legacy history: ${snapshot.history.filter((trace) => trace.legacyPathUsed).length}`,
     `Compatibility path: ${snapshot.diagnostics.compatibilityPathUsed ? "used" : "not used"}`,
     `History depth: ${snapshot.history.length}`,
+    `Passkey challenge: ${snapshot.security.passkeyProviderChallengeActive ? "active" : "idle"} ${
+      snapshot.security.passkeyProviderChallengeId ? `(${snapshot.security.passkeyProviderChallengeId})` : ""
+    }`,
+    `Passkey provider: ${snapshot.security.passkeyLastProviderName || "n/a"} • outcome ${titleCase(
+      snapshot.security.passkeyLastProviderOutcome
+    )} • reason ${snapshot.security.passkeyLastProviderReasonCode || "n/a"}`,
+    `Passkey outcome at: ${snapshot.security.passkeyLastProviderOutcomeAt || "n/a"}`,
   ];
 
   diagnosticsContent.innerHTML = "";
@@ -191,12 +207,26 @@ function renderDiagnostics(snapshot: OperatorSnapshot) {
   }
 }
 
+function renderSecurity(snapshot: OperatorSnapshot) {
+  securityPolicyMode.textContent = titleCase(snapshot.security.policyMode);
+  securityRequiresReauth.textContent = snapshot.security.requiresReauthNext ? "Yes" : "No";
+  securityReplayTotal.textContent = String(snapshot.security.replayTotalRecords || 0);
+  securityReplaySessionEvents.textContent = String(snapshot.security.replaySessionEventCount || 0);
+  securityReplayLastSequence.textContent = String(snapshot.security.replayLastSequence || 0);
+  securityBridgeStatus.textContent = snapshot.security.bridgeHealthy
+    ? `Bridge healthy • last update ${relativeTime(snapshot.security.bridgeLastUpdatedAt)}`
+    : `Bridge unavailable • ${snapshot.security.bridgeLastErrorCode || "n/a"}${
+        snapshot.security.bridgeLastErrorMessage ? ` (${snapshot.security.bridgeLastErrorMessage})` : ""
+      }`;
+}
+
 function renderSnapshot(snapshot: OperatorSnapshot) {
   renderMode(snapshot);
   setConnectionStatus(snapshot);
   renderActivePage(snapshot);
   renderLastAction(snapshot);
   renderDiagnostics(snapshot);
+  renderSecurity(snapshot);
 }
 
 function fetchSnapshot() {
@@ -322,7 +352,7 @@ sidePanelButton.addEventListener("click", (event) => {
     });
 });
 
-showClickablesCheckbox.addEventListener("change", () => {
+  showClickablesCheckbox.addEventListener("change", () => {
   chrome.runtime.sendMessage(
     {
       type: "set-overlay-policy",
@@ -357,5 +387,17 @@ modeSelect.addEventListener("change", () => {
     }
     renderSnapshot(normalizeSnapshot(response.snapshot as Partial<OperatorSnapshot>));
     refreshOverlayPolicy();
+  });
+
+  securityRefreshButton.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "security-refresh" }, () => {
+      fetchSnapshot();
+    });
+  });
+
+  securityResetButton.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "security-reset-replay" }, () => {
+      fetchSnapshot();
+    });
   });
 });

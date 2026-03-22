@@ -1,0 +1,9 @@
+{
+  "requestId": "req_...lure",
+  "securityContractVersion": "a1.v1",
+  "provider": "weba...uthn",
+  "verified": false,
+  "method": "passkey",
+  "challengeId": "chal..._s02",
+  "reasonCode": "provider_verification_failed"
+}

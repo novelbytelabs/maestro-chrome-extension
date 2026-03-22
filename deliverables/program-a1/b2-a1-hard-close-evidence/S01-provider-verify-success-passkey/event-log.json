@@ -1,0 +1,469 @@
+[
+  {
+    "id": "arq_1774190169831686478_92_8062dd",
+    "timestamp": "2026-03-22T21:34:26.863603",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "welcome": "Connected to ArqonBus",
+      "client_id": "arq_client_530c458d83474515b854db7b4393b6d2"
+    },
+    "args": {},
+    "metadata": {},
+    "sender": "arqonbus"
+  },
+  {
+    "id": "arq_1774215266863_1_31ee7a",
+    "timestamp": "2026-03-22T21:34:26.864695",
+    "type": "message_response",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "active",
+      "data": {
+        "app": "chrome",
+        "id": "chrome"
+      }
+    },
+    "args": {},
+    "metadata": {},
+    "sender": "arqonbus"
+  },
+  {
+    "id": "arq_1774215266864_2_798a91",
+    "timestamp": "2026-03-22T21:34:26.865402",
+    "type": "message_response",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "securityReportPasskeyProviderOutcome",
+      "data": {
+        "requestId": "req_s01_success",
+        "securityContractVersion": "a1.v1",
+        "provider": "webauthn",
+        "verified": true,
+        "method": "passkey",
+        "challengeId": "challenge_s01",
+        "reasonCode": ""
+      }
+    },
+    "args": {},
+    "metadata": {},
+    "sender": "arqonbus"
+  },
+  {
+    "id": "arq_1774215266865_689_2fc3aa",
+    "timestamp": "2026-03-22T21:34:26.865000+00:00",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "securityBridgeState",
+      "data": {
+        "requestId": "bridge_1774215266865",
+        "securityContractVersion": "a1.v1",
+        "securityMode": "normal",
+        "securityInteractionMode": "command",
+        "securityIdentityState": "verified_primary",
+        "securityIdentityDisplayName": "IRBSurfer",
+        "securityIdentityId": "profile_mn0sz2nv_jqnx5y",
+        "securityContaminated": false,
+        "securityIsVerified": true,
+        "securityConfidenceValue": 0.9,
+        "securityEvidenceReady": true,
+        "securityVerificationProviderReady": true,
+        "securityDiarizationProviderReady": true,
+        "securityVerificationProviderError": "",
+        "securityDiarizationProviderError": "",
+        "securityEnrollmentCount": 1,
+        "securityEnrollmentActive": true,
+        "securityEnrollmentStatus": "active",
+        "securityEnrollmentName": "IRBSurfer",
+        "securityProfiles": [
+          {
+            "id": "profile_mn0sz2nv_jqnx5y",
+            "displayName": "IRBSurfer",
+            "status": "active",
+            "role": "sovereign_owner",
+            "isActive": true,
+            "enrolledAt": "2026-03-21T20:51:09.500Z",
+            "updatedAt": "2026-03-22T21:14:26.994Z",
+            "lastVerifiedAt": "2026-03-22T21:14:26.994Z"
+          }
+        ],
+        "securityActiveProfileId": "profile_mn0sz2nv_jqnx5y",
+        "securityProfilesLastAction": "reenrolled:profile_mn0sz2nv_jqnx5y",
+        "securityProfilesLastError": "",
+        "securityLastAuthorizationDecision": "block",
+        "securityLastAuthorizationReason": "Locked mode: reflex-only",
+        "securityLastAuthorizationReasonCode": "authorize_block_locked_mode",
+        "securityLastBlockedCommand": "tab",
+        "securityLastBlockedAt": "2026-03-22T21:18:07.279Z",
+        "securityPolicyMode": "assist",
+        "securityRequiresReauthNext": false,
+        "securityGraceValid": false,
+        "securityGraceExpiresAt": "",
+        "securityLastReasonCode": "activation_detected_unknown",
+        "securityLastLifecyclePhase": "activated",
+        "securityLastInteractionId": 13,
+        "securityReplayGeneratedAt": "2026-03-22T21:34:26.865Z",
+        "securityReplayTotalRecords": 53,
+        "securityReplaySessionEventCount": 16,
+        "securityReplayLastSequence": 53,
+        "securityRequiredFactors": [
+          "voice"
+        ],
+        "securitySatisfiedFactors": [],
+        "securityMissingFactor": "voice",
+        "securityStepUpType": "none",
+        "securityFactorDecision": "block",
+        "securityLastFactorReasonCode": "auth_block_voice_required",
+        "securityPasskeyBootstrapRequired": false,
+        "securityPasskeyBootstrapped": false,
+        "securityPasskeyProviderReady": false,
+        "securityPasskeyBootstrapMethod": "none",
+        "securityPasskeyBootstrapAt": "",
+        "securityPasskeyProviderChallengeActive": false,
+        "securityPasskeyProviderChallengeId": "",
+        "securityPasskeyLastProviderName": "",
+        "securityPasskeyLastProviderOutcome": "none",
+        "securityPasskeyLastProviderReasonCode": "",
+        "securityPasskeyLastProviderOutcomeAt": ""
+      }
+    },
+    "args": {},
+    "metadata": {
+      "transport": "arqonbus",
+      "source": "maestro-client"
+    },
+    "room": "maestro",
+    "channel": "plugin.chrome",
+    "sender": "arq_client_63b73e20cfaa4c4781ee76518fff6fa9"
+  },
+  {
+    "id": "arq_1774215267838_36343_6b2424",
+    "timestamp": "2026-03-22T21:34:27.838000+00:00",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "securityRequestSnapshot",
+      "data": {
+        "requestId": "sec_arq_1774215266088_36339_b180ed",
+        "securityContractVersion": "a1.v1"
+      }
+    },
+    "args": {},
+    "metadata": {
+      "transport": "arqonbus"
+    },
+    "room": "maestro",
+    "channel": "plugin.chrome",
+    "sender": "arq_client_36359bf0041f49c8ada365156e763a65"
+  },
+  {
+    "id": "arq_1774215270089_36344_a3a6c2",
+    "timestamp": "2026-03-22T21:34:30.089000+00:00",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "securityRequestSnapshot",
+      "data": {
+        "requestId": "sec_arq_1774215266088_36339_b180ed",
+        "securityContractVersion": "a1.v1"
+      }
+    },
+    "args": {},
+    "metadata": {
+      "transport": "arqonbus"
+    },
+    "room": "maestro",
+    "channel": "plugin.chrome",
+    "sender": "arq_client_36359bf0041f49c8ada365156e763a65"
+  },
+  {
+    "id": "arq_1774215272088_36346_5ca4a0",
+    "timestamp": "2026-03-22T21:34:32.088000+00:00",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "securityRequestSnapshot",
+      "data": {
+        "requestId": "sec_arq_1774215272088_36345_ed7ef5",
+        "securityContractVersion": "a1.v1"
+      }
+    },
+    "args": {},
+    "metadata": {
+      "transport": "arqonbus"
+    },
+    "room": "maestro",
+    "channel": "plugin.chrome",
+    "sender": "arq_client_36359bf0041f49c8ada365156e763a65"
+  },
+  {
+    "id": "arq_1774215272769_36347_9af177",
+    "timestamp": "2026-03-22T21:34:32.769000+00:00",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "active",
+      "data": {
+        "app": "chrome",
+        "id": "chrome"
+      }
+    },
+    "args": {},
+    "metadata": {
+      "transport": "arqonbus"
+    },
+    "room": "maestro",
+    "channel": "plugin.chrome",
+    "sender": "arq_client_36359bf0041f49c8ada365156e763a65"
+  },
+  {
+    "id": "arq_1774215272771_36348_d36224",
+    "timestamp": "2026-03-22T21:34:32.771000+00:00",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "heartbeat",
+      "data": {
+        "app": "chrome",
+        "id": "chrome"
+      }
+    },
+    "args": {},
+    "metadata": {
+      "transport": "arqonbus"
+    },
+    "room": "maestro",
+    "channel": "plugin.chrome",
+    "sender": "arq_client_36359bf0041f49c8ada365156e763a65"
+  },
+  {
+    "id": "arq_1774215272771_690_1e9bae",
+    "timestamp": "2026-03-22T21:34:32.771000+00:00",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "securityBridgeState",
+      "data": {
+        "requestId": "bridge_1774215272771",
+        "securityContractVersion": "a1.v1",
+        "securityMode": "normal",
+        "securityInteractionMode": "command",
+        "securityIdentityState": "verified_primary",
+        "securityIdentityDisplayName": "IRBSurfer",
+        "securityIdentityId": "profile_mn0sz2nv_jqnx5y",
+        "securityContaminated": false,
+        "securityIsVerified": true,
+        "securityConfidenceValue": 0.9,
+        "securityEvidenceReady": true,
+        "securityVerificationProviderReady": true,
+        "securityDiarizationProviderReady": true,
+        "securityVerificationProviderError": "",
+        "securityDiarizationProviderError": "",
+        "securityEnrollmentCount": 1,
+        "securityEnrollmentActive": true,
+        "securityEnrollmentStatus": "active",
+        "securityEnrollmentName": "IRBSurfer",
+        "securityProfiles": [
+          {
+            "id": "profile_mn0sz2nv_jqnx5y",
+            "displayName": "IRBSurfer",
+            "status": "active",
+            "role": "sovereign_owner",
+            "isActive": true,
+            "enrolledAt": "2026-03-21T20:51:09.500Z",
+            "updatedAt": "2026-03-22T21:14:26.994Z",
+            "lastVerifiedAt": "2026-03-22T21:14:26.994Z"
+          }
+        ],
+        "securityActiveProfileId": "profile_mn0sz2nv_jqnx5y",
+        "securityProfilesLastAction": "reenrolled:profile_mn0sz2nv_jqnx5y",
+        "securityProfilesLastError": "",
+        "securityLastAuthorizationDecision": "block",
+        "securityLastAuthorizationReason": "Locked mode: reflex-only",
+        "securityLastAuthorizationReasonCode": "authorize_block_locked_mode",
+        "securityLastBlockedCommand": "tab",
+        "securityLastBlockedAt": "2026-03-22T21:18:07.279Z",
+        "securityPolicyMode": "assist",
+        "securityRequiresReauthNext": false,
+        "securityGraceValid": false,
+        "securityGraceExpiresAt": "",
+        "securityLastReasonCode": "activation_detected_unknown",
+        "securityLastLifecyclePhase": "activated",
+        "securityLastInteractionId": 13,
+        "securityReplayGeneratedAt": "2026-03-22T21:34:32.771Z",
+        "securityReplayTotalRecords": 53,
+        "securityReplaySessionEventCount": 16,
+        "securityReplayLastSequence": 53,
+        "securityRequiredFactors": [
+          "voice"
+        ],
+        "securitySatisfiedFactors": [],
+        "securityMissingFactor": "voice",
+        "securityStepUpType": "none",
+        "securityFactorDecision": "block",
+        "securityLastFactorReasonCode": "auth_block_voice_required",
+        "securityPasskeyBootstrapRequired": false,
+        "securityPasskeyBootstrapped": false,
+        "securityPasskeyProviderReady": false,
+        "securityPasskeyBootstrapMethod": "none",
+        "securityPasskeyBootstrapAt": "",
+        "securityPasskeyProviderChallengeActive": false,
+        "securityPasskeyProviderChallengeId": "",
+        "securityPasskeyLastProviderName": "",
+        "securityPasskeyLastProviderOutcome": "none",
+        "securityPasskeyLastProviderReasonCode": "",
+        "securityPasskeyLastProviderOutcomeAt": ""
+      }
+    },
+    "args": {},
+    "metadata": {
+      "transport": "arqonbus",
+      "source": "maestro-client"
+    },
+    "room": "maestro",
+    "channel": "plugin.chrome",
+    "sender": "arq_client_63b73e20cfaa4c4781ee76518fff6fa9"
+  },
+  {
+    "id": "arq_1774215272772_691_9d401f",
+    "timestamp": "2026-03-22T21:34:32.773000+00:00",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "securityBridgeState",
+      "data": {
+        "requestId": "bridge_1774215272772",
+        "securityContractVersion": "a1.v1",
+        "securityMode": "normal",
+        "securityInteractionMode": "command",
+        "securityIdentityState": "verified_primary",
+        "securityIdentityDisplayName": "IRBSurfer",
+        "securityIdentityId": "profile_mn0sz2nv_jqnx5y",
+        "securityContaminated": false,
+        "securityIsVerified": true,
+        "securityConfidenceValue": 0.9,
+        "securityEvidenceReady": true,
+        "securityVerificationProviderReady": true,
+        "securityDiarizationProviderReady": true,
+        "securityVerificationProviderError": "",
+        "securityDiarizationProviderError": "",
+        "securityEnrollmentCount": 1,
+        "securityEnrollmentActive": true,
+        "securityEnrollmentStatus": "active",
+        "securityEnrollmentName": "IRBSurfer",
+        "securityProfiles": [
+          {
+            "id": "profile_mn0sz2nv_jqnx5y",
+            "displayName": "IRBSurfer",
+            "status": "active",
+            "role": "sovereign_owner",
+            "isActive": true,
+            "enrolledAt": "2026-03-21T20:51:09.500Z",
+            "updatedAt": "2026-03-22T21:14:26.994Z",
+            "lastVerifiedAt": "2026-03-22T21:14:26.994Z"
+          }
+        ],
+        "securityActiveProfileId": "profile_mn0sz2nv_jqnx5y",
+        "securityProfilesLastAction": "reenrolled:profile_mn0sz2nv_jqnx5y",
+        "securityProfilesLastError": "",
+        "securityLastAuthorizationDecision": "block",
+        "securityLastAuthorizationReason": "Locked mode: reflex-only",
+        "securityLastAuthorizationReasonCode": "authorize_block_locked_mode",
+        "securityLastBlockedCommand": "tab",
+        "securityLastBlockedAt": "2026-03-22T21:18:07.279Z",
+        "securityPolicyMode": "assist",
+        "securityRequiresReauthNext": false,
+        "securityGraceValid": false,
+        "securityGraceExpiresAt": "",
+        "securityLastReasonCode": "activation_detected_unknown",
+        "securityLastLifecyclePhase": "activated",
+        "securityLastInteractionId": 13,
+        "securityReplayGeneratedAt": "2026-03-22T21:34:32.772Z",
+        "securityReplayTotalRecords": 53,
+        "securityReplaySessionEventCount": 16,
+        "securityReplayLastSequence": 53,
+        "securityRequiredFactors": [
+          "voice"
+        ],
+        "securitySatisfiedFactors": [],
+        "securityMissingFactor": "voice",
+        "securityStepUpType": "none",
+        "securityFactorDecision": "block",
+        "securityLastFactorReasonCode": "auth_block_voice_required",
+        "securityPasskeyBootstrapRequired": false,
+        "securityPasskeyBootstrapped": false,
+        "securityPasskeyProviderReady": false,
+        "securityPasskeyBootstrapMethod": "none",
+        "securityPasskeyBootstrapAt": "",
+        "securityPasskeyProviderChallengeActive": false,
+        "securityPasskeyProviderChallengeId": "",
+        "securityPasskeyLastProviderName": "",
+        "securityPasskeyLastProviderOutcome": "none",
+        "securityPasskeyLastProviderReasonCode": "",
+        "securityPasskeyLastProviderOutcomeAt": ""
+      }
+    },
+    "args": {},
+    "metadata": {
+      "transport": "arqonbus",
+      "source": "maestro-client"
+    },
+    "room": "maestro",
+    "channel": "plugin.chrome",
+    "sender": "arq_client_63b73e20cfaa4c4781ee76518fff6fa9"
+  },
+  {
+    "id": "arq_1774215273838_36349_5822b5",
+    "timestamp": "2026-03-22T21:34:33.838000+00:00",
+    "type": "message",
+    "version": "1.0",
+    "payload": {
+      "protocol": "maestro-plugin-v1",
+      "app": "chrome",
+      "id": "chrome",
+      "message": "securityRequestSnapshot",
+      "data": {
+        "requestId": "sec_arq_1774215272088_36345_ed7ef5",
+        "securityContractVersion": "a1.v1"
+      }
+    },
+    "args": {},
+    "metadata": {
+      "transport": "arqonbus"
+    },
+    "room": "maestro",
+    "channel": "plugin.chrome",
+    "sender": "arq_client_36359bf0041f49c8ada365156e763a65"
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "requestId": "req_002",
+  "securityContractVersion": "a1.v1",
+  "generatedAt": "2026-03-21T12:00:00.000Z",
+  "totalRecords": 8,
+  "recordsByCategory": {
+    "authorization_decision": 5,
+    "security_session_event": 3
+  },
+  "lastSequence": 91
+}
