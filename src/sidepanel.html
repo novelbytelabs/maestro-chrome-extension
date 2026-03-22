@@ -127,6 +127,39 @@
         </div>
         <p class="lede small">This beta enforces a conservative runtime posture on sensitive domains and keeps overlay automation scoped per tab.</p>
       </section>
+
+      <section class="panel-card">
+        <div class="hero-row">
+          <p class="section-label">Security Replay</p>
+          <div>
+            <button id="securityReplayRefresh" class="inline-action" type="button" title="Refresh replay">↻</button>
+            <button id="securityReplayReset" class="inline-action" type="button" title="Reset replay (devtools only)">⟳</button>
+          </div>
+        </div>
+        <div class="metric-grid compact">
+          <div class="metric">
+            <span class="metric-label">Policy mode</span>
+            <span id="securityPolicyModePanel" class="metric-value">n/a</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Requires re-auth next</span>
+            <span id="securityRequiresReauthPanel" class="metric-value">n/a</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Total records</span>
+            <span id="securityReplayTotalPanel" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Session events</span>
+            <span id="securityReplaySessionPanel" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Last sequence</span>
+            <span id="securityReplaySequencePanel" class="metric-value">0</span>
+          </div>
+        </div>
+        <p id="securityBridgeStatusPanel" class="lede small">Security bridge status unknown.</p>
+      </section>
     </main>
     <script src="sidepanel.js"></script>
   </body>

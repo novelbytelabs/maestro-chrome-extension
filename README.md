@@ -35,6 +35,18 @@ For the release contract, see [docs/SUPPORTED_COMMANDS.md](docs/SUPPORTED_COMMAN
 
 ## Install
 
+The Arqon Maestro extension is now available on the Chrome Web Store.
+
+1. Visit the [Arqon Maestro Chrome Web Store Page](https://chromewebstore.google.com/detail/arqon-maestro/bmmbdafijegjhckimaoinnediipgoakp?authuser=0&hl=en).
+2. Click **Add to Chrome**.
+3. **Pin the extension**: Click the puzzle icon (Extensions) in your Chrome toolbar and click the pin icon next to **Arqon Maestro**.
+
+After loading the extension, reload any tabs that were already open.
+
+### Manual / Developer Install
+
+If you prefer to load the extension from source:
+
 1. Run `npm install`
 2. Run `npm run build`
 3. In Chrome, open `chrome://extensions`

@@ -92,6 +92,13 @@ Promotional images are not required for the current public beta submission. The 
 
 ---
 
+## Official Store Link
+
+The extension is published at:
+[Arqon Maestro Chrome Web Store](https://chromewebstore.google.com/detail/arqon-maestro/bmmbdafijegjhckimaoinnediipgoakp?authuser=0&hl=en)
+
+---
+
 ## Store Setup Checklist
 
 - [x] Create Chrome Web Store developer account ($5)
@@ -99,12 +106,14 @@ Promotional images are not required for the current public beta submission. The 
 - [x] Write short description (≤132 chars)
 - [x] Write detailed description
 - [x] Create/upload screenshots (1280x800 recommended)
-- [ ] Add promotional images (optional, skip for current beta)
+- [x] Add promotional images (optional, skip for current beta)
 - [x] Set category: Developer Tools
 - [x] Add privacy policy URL
-- [ ] Verify extension works in Chrome
-- [ ] Verify listing copy matches `docs/SUPPORTED_COMMANDS.md`
+- [x] Verify extension works in Chrome
+- [x] Verify listing copy matches `docs/SUPPORTED_COMMANDS.md`
 - [x] Submit for review
+- [x] **Published to Chrome Web Store**
+
 
 ---
 

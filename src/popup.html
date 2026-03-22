@@ -115,6 +115,39 @@
         <p class="section-label">Diagnostics</p>
         <div id="diagnosticsContent" class="diagnostics-content"></div>
       </section>
+
+      <section class="intel-card">
+        <div class="card-header">
+          <p class="section-label">Security Replay</p>
+          <div>
+            <button id="securityRefresh" class="inline-action" type="button" title="Refresh security replay">↻</button>
+            <button id="securityReset" class="inline-action" type="button" title="Reset replay (devtools only)">⟳</button>
+          </div>
+        </div>
+        <div class="metric-grid compact">
+          <div class="metric">
+            <span class="metric-label">Policy mode</span>
+            <span id="securityPolicyMode" class="metric-value">n/a</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Requires re-auth</span>
+            <span id="securityRequiresReauth" class="metric-value">n/a</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Replay records</span>
+            <span id="securityReplayTotal" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Session events</span>
+            <span id="securityReplaySessionEvents" class="metric-value">0</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Last sequence</span>
+            <span id="securityReplayLastSequence" class="metric-value">0</span>
+          </div>
+        </div>
+        <p id="securityBridgeStatus" class="status-hint">Security bridge status unknown.</p>
+      </section>
     </main>
     <script src="popup.js"></script>
   </body>
